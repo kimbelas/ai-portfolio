@@ -1,0 +1,21 @@
+{
+  "name": "ai-agent-platform",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Autonomous Agent Platform — Flagship 2 of a senior AI engineer portfolio. Agent loop from first principles, then LangGraph.js: tools, state, human-in-the-loop, guardrails, checkpoints.",
+  "scripts": {
+    "learn:01": "tsx src/learn/01-tool-call.ts",
+    "learn:02": "tsx src/learn/02-agent-loop.ts"
+  },
+  "dependencies": {
+    "dotenv": "^17.4.2",
+    "openai": "^6.49.0",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@types/node": "^26.1.1",
+    "tsx": "^4.23.1",
+    "typescript": "^7.0.2"
+  }
+}
