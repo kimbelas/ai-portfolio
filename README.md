@@ -9,8 +9,8 @@ Each project is built as a "rung ladder" — one runnable step per concept — s
 ### 1. [AI Knowledge Assistant](./ai-knowledge-assistant) — RAG *(complete)*
 Retrieval-Augmented Generation: ingest documents → **hybrid retrieval** (semantic + keyword, Reciprocal Rank Fusion) → **grounded, cited answers** with an "I don't know" refusal. Ships with an **eval harness** (retrieval recall@k + LLM-as-judge) and a **production layer** (streaming, relevance-floor guardrail, cost meter). 8-rung build from a single LLM call up. See its [walkthrough](./ai-knowledge-assistant/docs/WALKTHROUGH.md) and [ADRs](./ai-knowledge-assistant/docs/adr).
 
-### 2. [AI Agent Platform](./ai-agent-platform) — Autonomous agents *(in progress)*
-An agent built from its atom (LLM + tools + loop), then on **LangGraph.js**: tool calling, multi-step planning, human-in-the-loop approval, guardrails, observability, and checkpoints.
+### 2. [AI Agent Platform](./ai-agent-platform) — Autonomous agents *(complete)*
+An agent built from its atom (LLM + tools + loop), then on **LangGraph.js**: tool calling, multi-step planning, **human-in-the-loop approval** for risky actions, **guardrails** (input validation, prompt-injection defense, allow-list, timeouts, step budget), **observability** (per-node token/cost/latency trace), and **checkpoints** (pause/resume + cross-turn memory). 8-rung build (A1–A8), all runnable.
 
 ### 3. MCP-native coding assistant *(planned)*
 

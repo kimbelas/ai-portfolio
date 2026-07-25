@@ -6,9 +6,18 @@
   "description": "Autonomous Agent Platform — Flagship 2 of a senior AI engineer portfolio. Agent loop from first principles, then LangGraph.js: tools, state, human-in-the-loop, guardrails, checkpoints.",
   "scripts": {
     "learn:01": "tsx src/learn/01-tool-call.ts",
-    "learn:02": "tsx src/learn/02-agent-loop.ts"
+    "learn:02": "tsx src/learn/02-agent-loop.ts",
+    "learn:03": "tsx src/learn/03-langgraph-basics.ts",
+    "learn:04": "tsx src/learn/04-routing.ts",
+    "learn:05": "tsx src/learn/05-hitl.ts",
+    "learn:06": "tsx src/learn/06-guardrails.ts",
+    "learn:07": "tsx src/learn/07-observability.ts",
+    "learn:08": "tsx src/learn/08-checkpoints.ts"
   },
   "dependencies": {
+    "@langchain/core": "^1.2.3",
+    "@langchain/langgraph": "^1.4.8",
+    "@langchain/openai": "^1.5.5",
     "dotenv": "^17.4.2",
     "openai": "^6.49.0",
     "zod": "^4.4.3"
