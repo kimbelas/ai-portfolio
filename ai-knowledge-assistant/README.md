@@ -1,3 +1,14 @@
+---
+title: Acme Knowledge Assistant
+emoji: 📚
+colorFrom: blue
+colorTo: indigo
+sdk: docker
+app_port: 7860
+pinned: false
+short_description: RAG chat over docs — grounded, cited answers
+---
+
 # AI Knowledge Assistant
 
 **Flagship 1 of a senior AI engineer portfolio.** A RAG (Retrieval-Augmented Generation) system — ask questions about a document set, get grounded, cited answers — built from first principles and *measured*, not demoed.
