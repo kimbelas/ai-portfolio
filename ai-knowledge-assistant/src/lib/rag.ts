@@ -1,6 +1,14 @@
 import { chat, streamChat } from "./llm";
-import { retrieveHybrid } from "./retrieve";
+import { retrieveReranked } from "./retrieve";
 import type { InMemoryVectorStore, StoredChunk } from "./vectorStore";
+
+// A retrieval strategy: (store, query, k) -> top-k chunks. Pluggable so the
+// eval can compare hybrid vs hybrid+rerank against the same answer pipeline.
+export type Retriever = (
+  store: InMemoryVectorStore,
+  q: string,
+  k: number,
+) => Promise<StoredChunk[]>;
 
 // The grounding contract: answer ONLY from context, cite sources, and refuse
 // when the answer isn't there. This is what turns an LLM into a trustworthy
@@ -17,13 +25,15 @@ export interface RagResult {
   usage: any;
 }
 
-/** Retrieve -> stuff context into the prompt -> generate a grounded answer. */
+/** Retrieve -> stuff context into the prompt -> generate a grounded answer.
+ *  Defaults to reranked retrieval (best quality); pass a retriever to compare. */
 export async function answerQuestion(
   store: InMemoryVectorStore,
   question: string,
   k = 4,
+  retrieve: Retriever = retrieveReranked,
 ): Promise<RagResult> {
-  const sources = await retrieveHybrid(store, question, k);
+  const sources = await retrieve(store, question, k);
   const { text, usage } = await chat({
     system: SYSTEM,
     user: `Context:\n${buildContext(sources)}\n\nQuestion: ${question}`,
@@ -37,8 +47,9 @@ export async function* answerQuestionStream(
   store: InMemoryVectorStore,
   question: string,
   k = 4,
+  retrieve: Retriever = retrieveReranked,
 ) {
-  const sources = await retrieveHybrid(store, question, k);
+  const sources = await retrieve(store, question, k);
   yield { type: "sources" as const, sources };
   for await (const delta of streamChat({
     system: SYSTEM,

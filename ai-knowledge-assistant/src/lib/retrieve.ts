@@ -1,4 +1,5 @@
 import { embed } from "./embeddings";
+import { rerank } from "./rerank";
 import type { InMemoryVectorStore, StoredChunk } from "./vectorStore";
 
 const STOPWORDS = new Set(
@@ -61,4 +62,22 @@ export async function retrieveHybrid(
     .sort((a, b) => b[1] - a[1])
     .slice(0, k)
     .map(([id]) => byId.get(id)!);
+}
+
+/**
+ * Hybrid retrieval + cross-encoder rerank. Retrieve a WIDE candidate set with
+ * hybrid, then re-score each (query, chunk) pair with the cross-encoder and
+ * keep the top-k. This is what pulls a truly-relevant chunk that hybrid buried
+ * at rank ~8 up into the top-k — the reranker's whole job.
+ */
+export async function retrieveReranked(
+  store: InMemoryVectorStore,
+  query: string,
+  k: number,
+  candidateN = 15,
+): Promise<StoredChunk[]> {
+  const candidates = await retrieveHybrid(store, query, candidateN);
+  if (candidates.length <= k) return candidates.slice(0, k);
+  const ranked = await rerank(query, candidates.map((c) => c.text));
+  return ranked.slice(0, k).map((r) => candidates[r.index]);
 }
