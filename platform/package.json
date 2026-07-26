@@ -1,0 +1,24 @@
+{
+  "name": "@portfolio/platform",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Platform layer — composes the flagships: a LangGraph agent (Flagship 2 tech) that consults the RAG knowledge base (Flagship 1) via a tool, on a shared ai-kit.",
+  "scripts": {
+    "probe": "tsx src/probe.ts",
+    "demo": "tsx src/learn/01-agent-with-rag.ts"
+  },
+  "dependencies": {
+    "@langchain/core": "^1.2.3",
+    "@langchain/langgraph": "^1.4.8",
+    "@langchain/openai": "^1.5.5",
+    "dotenv": "^17.4.2",
+    "openai": "^6.49.0",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@types/node": "^26.1.1",
+    "tsx": "^4.23.1",
+    "typescript": "^7.0.2"
+  }
+}

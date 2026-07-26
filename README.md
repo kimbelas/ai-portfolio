@@ -15,6 +15,10 @@ An agent built from its atom (LLM + tools + loop), then on **LangGraph.js**: too
 ### 3. [AI MCP Assistant](./ai-mcp-assistant) — MCP-native dev assistant *(complete)*
 An MCP **server** (stdio) exposing codebase tools (`list_files`, `read_file`, `search_code`) + an MCP **client/host** that bridges those tools into a Groq function-calling loop for **codebase Q&A with file:line citations**. Built from first principles: raw protocol → client discovery/calls → LLM-over-MCP → the product. See its [ADR](./ai-mcp-assistant/docs/adr/0001-mcp-stdio-and-tool-reliability.md).
 
+## Platform layer — one system from three flagships
+
+[`platform/`](./platform) composes the flagships into a single agent: a **LangGraph agent** (Flagship 2) that consults **Flagship 1's RAG** (hybrid + rerank) via a `search_knowledge_base` tool and does arithmetic, on a shared **`ai-kit`** (model factory + guardrails + cost meter) — the "extensible AI platform" story, running end to end (`npm --prefix platform run demo`). See its [ADR](./platform/docs/adr/0001-cross-package-composition.md).
+
 ## Strategy
 
 See [`ai-portfolio-plan.md`](./ai-portfolio-plan.md) — the plan and the senior-signal principles (evals with real numbers, a production layer, and ADRs) that drive every project.
