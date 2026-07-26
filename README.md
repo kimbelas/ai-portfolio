@@ -12,7 +12,8 @@ Retrieval-Augmented Generation: ingest documents → **hybrid retrieval** (seman
 ### 2. [AI Agent Platform](./ai-agent-platform) — Autonomous agents *(complete)*
 An agent built from its atom (LLM + tools + loop), then on **LangGraph.js**: tool calling, multi-step planning, **human-in-the-loop approval** for risky actions, **guardrails** (input validation, prompt-injection defense, allow-list, timeouts, step budget), **observability** (per-node token/cost/latency trace), and **checkpoints** (pause/resume + cross-turn memory). 8-rung build (A1–A8), all runnable.
 
-### 3. MCP-native coding assistant *(planned)*
+### 3. [AI MCP Assistant](./ai-mcp-assistant) — MCP-native dev assistant *(complete)*
+An MCP **server** (stdio) exposing codebase tools (`list_files`, `read_file`, `search_code`) + an MCP **client/host** that bridges those tools into a Groq function-calling loop for **codebase Q&A with file:line citations**. Built from first principles: raw protocol → client discovery/calls → LLM-over-MCP → the product. See its [ADR](./ai-mcp-assistant/docs/adr/0001-mcp-stdio-and-tool-reliability.md).
 
 ## Strategy
 

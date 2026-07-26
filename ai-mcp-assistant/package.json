@@ -1,0 +1,25 @@
+{
+  "name": "ai-mcp-assistant",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "MCP-native dev assistant — Flagship 3. An MCP server exposing dev tools over stdio, and an MCP client that drives an LLM (Groq) over those tools.",
+  "scripts": {
+    "server": "tsx src/server.ts",
+    "learn:01": "tsx src/learn/01-client-basics.ts",
+    "learn:02": "tsx src/learn/02-llm-over-mcp.ts",
+    "learn:03": "tsx src/learn/03-codebase-qa.ts",
+    "ask": "tsx src/cli/ask.ts"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.29.0",
+    "dotenv": "^17.4.2",
+    "openai": "^6.49.0",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@types/node": "^26.1.1",
+    "tsx": "^4.23.1",
+    "typescript": "^7.0.2"
+  }
+}
