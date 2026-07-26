@@ -11,6 +11,7 @@ npm install
 cp .env.example .env            # add GROQ_API_KEY (free: https://console.groq.com/keys)
 
 npm run ask -- "Can Acme staff read my files, and is it SOC 2 certified?"
+npm run web                     # browser chat UI → http://localhost:8787
 npm run eval                    # benchmark: recall@k (3 retrievers) + LLM-judged correctness
 npm run learn:01                # ... through learn:08, the guided build
 ```
@@ -75,6 +76,6 @@ Answer correctness (LLM-judged): **93% → 100%** with reranking. The reranker f
 
 ## Status & roadmap
 
-**Done:** full pipeline (ingest → chunk → embed → hybrid retrieve → **rerank** → grounded/cited answer → refusal), eval harness with a real benchmark, streaming + guardrail + cost meter, `ask` CLI, 4 ADRs.
+**Done:** full pipeline (ingest → chunk → embed → hybrid retrieve → **rerank** → grounded/cited answer → refusal), eval harness with a real benchmark, streaming + guardrail + cost meter, `ask` CLI, **browser chat UI** (`npm run web`), 4 ADRs.
 
-**Production graduation (next):** pgvector (Docker) · PDF ingestion · larger corpus + eval set · API + streaming web UI · Dockerize + deploy · blog post.
+**Production graduation (next):** pgvector (Docker) · PDF ingestion · larger corpus + eval set · **deploy the web UI** (host) · blog post.
