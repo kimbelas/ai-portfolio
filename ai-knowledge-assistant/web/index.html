@@ -23,7 +23,20 @@
       }
       .wrap { width: 100%; max-width: 720px; padding: 32px 20px 64px; }
       header h1 { font-size: 20px; margin: 0 0 4px; }
-      header p { color: var(--muted); margin: 0 0 20px; }
+      header p { color: var(--muted); margin: 0 0 18px; }
+      a { color: var(--accent); }
+      .kbbar {
+        background: var(--panel2); border: 1px solid var(--border); border-radius: 10px;
+        padding: 10px 12px; font-size: 13px; color: var(--muted); margin-bottom: 12px;
+      }
+      .kbbar strong { color: var(--text); }
+      .kbbar .reset { margin-left: 8px; cursor: pointer; color: var(--accent); }
+      .drop {
+        border: 1.5px dashed var(--border); border-radius: 12px; padding: 16px;
+        text-align: center; color: var(--muted); font-size: 13px; margin-bottom: 16px;
+        transition: border-color .15s, background .15s;
+      }
+      .drop.drag { border-color: var(--accent); background: var(--panel2); }
       .examples { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
       .chip {
         background: var(--chip); color: var(--text); border: 1px solid var(--border);
@@ -31,11 +44,11 @@
       }
       .chip:hover { border-color: var(--accent); }
       form { display: flex; gap: 8px; }
-      input {
+      input[type=text] {
         flex: 1; background: var(--panel); color: var(--text); border: 1px solid var(--border);
         border-radius: 10px; padding: 12px 14px; font-size: 15px; outline: none;
       }
-      input:focus { border-color: var(--accent); }
+      input[type=text]:focus { border-color: var(--accent); }
       button {
         background: var(--accent); color: #fff; border: 0; border-radius: 10px;
         padding: 0 18px; font-size: 15px; font-weight: 600; cursor: pointer;
@@ -57,24 +70,31 @@
     <div class="wrap">
       <header>
         <h1>Acme Knowledge Assistant</h1>
-        <p>Ask about the Acme docs. Answers are <strong>grounded</strong> in the knowledge base (hybrid retrieval + reranking) and <strong>cited</strong> — it says &ldquo;I don&rsquo;t know&rdquo; when the docs don&rsquo;t cover it.</p>
+        <p>Grounded, cited answers over a document set (hybrid retrieval + reranking). It only answers from the provided docs, and says &ldquo;I don&rsquo;t know&rdquo; when they don&rsquo;t cover it.</p>
       </header>
+
+      <div class="kbbar" id="kbbar">Answering from the built-in <strong>Acme</strong> docs.</div>
+
+      <div class="drop" id="drop">
+        <input id="file" type="file" multiple accept=".pdf,.md,.markdown,.txt,.docx" hidden />
+        Drag files here, or <a id="browse" href="#">choose files</a> — <strong>PDF, Markdown, or Word (.docx)</strong>.
+        Your files become the <em>only</em> source the assistant answers from.
+      </div>
 
       <div class="examples" id="examples">
         <span class="chip">Is Acme HIPAA compliant?</span>
         <span class="chip">Does Acme support SAML single sign-on?</span>
         <span class="chip">What is the API rate limit?</span>
-        <span class="chip">Can staff read my files?</span>
         <span class="chip">Who is the CEO?</span>
       </div>
 
       <form id="form">
-        <input id="q" autocomplete="off" placeholder="Ask a question about Acme…" />
+        <input id="q" type="text" autocomplete="off" placeholder="Ask a question…" />
         <button id="send" type="submit">Ask</button>
       </form>
 
       <div id="out"></div>
-      <div class="foot">RAG over local docs · Groq + on-device embeddings/reranker · grounded &amp; cited.</div>
+      <div class="foot">RAG over local docs · Groq + on-device embeddings/reranker · grounded &amp; cited. <a href="/manual">How it works →</a></div>
     </div>
 
     <script>
@@ -82,8 +102,15 @@
       const input = document.getElementById("q");
       const send = document.getElementById("send");
       const out = document.getElementById("out");
+      const drop = document.getElementById("drop");
+      const fileInput = document.getElementById("file");
+      const kbbar = document.getElementById("kbbar");
+      const examples = document.getElementById("examples");
 
-      document.getElementById("examples").addEventListener("click", (e) => {
+      let activeKb = null; // null = built-in Acme docs
+
+      // ---- ask ----
+      examples.addEventListener("click", (e) => {
         if (e.target.classList.contains("chip")) { input.value = e.target.textContent; ask(); }
       });
       form.addEventListener("submit", (e) => { e.preventDefault(); ask(); });
@@ -104,7 +131,7 @@
           const r = await fetch("/api/ask", {
             method: "POST",
             headers: { "content-type": "application/json" },
-            body: JSON.stringify({ question }),
+            body: JSON.stringify({ question, kbId: activeKb }),
           });
           const data = await r.json();
           if (data.error) throw new Error(data.error);
@@ -122,6 +149,53 @@
           send.disabled = false;
           input.focus();
         }
+      }
+
+      // ---- upload ----
+      document.getElementById("browse").addEventListener("click", (e) => { e.preventDefault(); fileInput.click(); });
+      fileInput.addEventListener("change", () => upload([...fileInput.files]));
+      ["dragenter", "dragover"].forEach((ev) => drop.addEventListener(ev, (e) => { e.preventDefault(); drop.classList.add("drag"); }));
+      ["dragleave", "drop"].forEach((ev) => drop.addEventListener(ev, (e) => { e.preventDefault(); drop.classList.remove("drag"); }));
+      drop.addEventListener("drop", (e) => upload([...e.dataTransfer.files]));
+
+      function toBase64(file) {
+        return new Promise((res, rej) => {
+          const r = new FileReader();
+          r.onload = () => res(String(r.result).split(",")[1]);
+          r.onerror = rej;
+          r.readAsDataURL(file);
+        });
+      }
+
+      async function upload(files) {
+        if (!files.length) return;
+        kbbar.innerHTML = '<span class="dot"></span> indexing ' + files.length + ' file(s)…';
+        try {
+          const payload = { files: [] };
+          for (const f of files) payload.files.push({ name: f.name, base64: await toBase64(f) });
+          const r = await fetch("/api/upload", {
+            method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(payload),
+          });
+          const data = await r.json();
+          if (data.error) throw new Error(data.error);
+          activeKb = data.kbId;
+          examples.style.display = "none";
+          input.placeholder = "Ask a question about your uploaded files…";
+          kbbar.innerHTML = 'Answering <strong>only</strong> from your files: <strong>' +
+            data.names.join(", ") + '</strong> (' + data.chunks + ' chunks)' +
+            '<span class="reset" id="reset">use built-in docs</span>';
+          document.getElementById("reset").addEventListener("click", resetKb);
+        } catch (err) {
+          kbbar.innerHTML = 'Upload failed: ' + err.message + ' <span class="reset" id="reset">use built-in docs</span>';
+          const rb = document.getElementById("reset"); if (rb) rb.addEventListener("click", resetKb);
+        }
+      }
+
+      function resetKb() {
+        activeKb = null;
+        examples.style.display = "flex";
+        input.placeholder = "Ask a question…";
+        kbbar.innerHTML = "Answering from the built-in <strong>Acme</strong> docs.";
       }
     </script>
   </body>

@@ -1,60 +1,119 @@
 /**
- * A tiny web UI for the RAG assistant — zero extra dependencies (Node's
- * built-in http). Serves a single-page chat and a POST /api/ask endpoint that
- * runs the reranked, grounded, cited pipeline.
+ * Web UI for the RAG assistant (zero extra web deps — Node's built-in http).
  *
- * Run with:  npm run web   (needs GROQ_API_KEY) -> http://localhost:8787
+ * Routes:
+ *   GET  /            → the chat page
+ *   GET  /manual      → a "secret" explainer of how the whole system works
+ *   POST /api/upload  → {files:[{name, base64}]} → builds an ISOLATED knowledge
+ *                       base from the uploaded PDF/MD/DOCX and returns a kbId
+ *   POST /api/ask     → {question, kbId?} → grounded, cited answer. If kbId is
+ *                       given, answers ONLY from that upload; else the built-in docs.
+ *
+ * Run with:  npm run web   (needs GROQ_API_KEY) → http://localhost:8787
  */
 
 import "dotenv/config";
-import { createServer } from "node:http";
+import { createServer, type IncomingMessage } from "node:http";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
+import { randomUUID } from "node:crypto";
 import { buildKnowledgeBase } from "../lib/kb";
 import { answerQuestion } from "../lib/rag";
+import { chunkText } from "../lib/chunk";
+import { embed } from "../lib/embeddings";
+import { InMemoryVectorStore } from "../lib/vectorStore";
+import { extractText } from "../lib/extract";
 
-const HERE = dirname(fileURLToPath(import.meta.url));
-const HTML = readFileSync(resolve(HERE, "../../web/index.html"), "utf8");
+const WEB = resolve(dirname(fileURLToPath(import.meta.url)), "../../web");
+const INDEX_HTML = readFileSync(resolve(WEB, "index.html"), "utf8");
+const MANUAL_HTML = readFileSync(resolve(WEB, "manual.html"), "utf8");
 const PORT = Number(process.env.PORT) || 8787;
+const MAX_UPLOAD_BYTES = 10 * 1024 * 1024; // ~10 MB of base64 per upload request
 
-// Build the knowledge base once at startup; reuse across requests.
-const storePromise = buildKnowledgeBase();
+// The built-in Acme knowledge base (default when no upload is active).
+const defaultStore = buildKnowledgeBase();
 
-const server = createServer((req, res) => {
-  if (req.method === "GET" && (req.url === "/" || req.url === "/index.html")) {
+// Isolated per-upload knowledge bases. The client passes its kbId with each
+// question, so one visitor's docs never leak into another's answers.
+const uploads = new Map<string, { store: InMemoryVectorStore; names: string[] }>();
+const MAX_UPLOADS = 25;
+
+function readBody(req: IncomingMessage, limit: number): Promise<string> {
+  return new Promise((res, rej) => {
+    let body = "";
+    let size = 0;
+    req.on("data", (c) => {
+      size += c.length;
+      if (size > limit) {
+        rej(new Error("payload too large"));
+        req.destroy();
+      } else {
+        body += c;
+      }
+    });
+    req.on("end", () => res(body));
+    req.on("error", rej);
+  });
+}
+
+const server = createServer(async (req, res) => {
+  const json = (code: number, obj: unknown) => {
+    res.writeHead(code, { "content-type": "application/json" });
+    res.end(JSON.stringify(obj));
+  };
+  const html = (body: string) => {
     res.writeHead(200, { "content-type": "text/html; charset=utf-8" });
-    res.end(HTML);
-    return;
+    res.end(body);
+  };
+
+  if (req.method === "GET" && (req.url === "/" || req.url === "/index.html")) return html(INDEX_HTML);
+  if (req.method === "GET" && req.url === "/manual") return html(MANUAL_HTML);
+
+  if (req.method === "POST" && req.url === "/api/upload") {
+    try {
+      const { files } = JSON.parse(await readBody(req, MAX_UPLOAD_BYTES));
+      if (!Array.isArray(files) || files.length === 0) return json(400, { error: "no files provided" });
+
+      const store = new InMemoryVectorStore();
+      const names: string[] = [];
+      let chunks = 0;
+      for (const f of files) {
+        const buf = Buffer.from(String(f.base64 ?? ""), "base64");
+        const text = await extractText(String(f.name ?? "file"), buf);
+        const source = String(f.name ?? "file").replace(/\.[^.]+$/, "");
+        for (const c of chunkText(source, text)) {
+          store.add(c, await embed(c.text));
+          chunks++;
+        }
+        names.push(String(f.name));
+      }
+      if (store.size() === 0) return json(400, { error: "no text could be extracted from those files" });
+
+      const kbId = randomUUID();
+      uploads.set(kbId, { store, names });
+      // Evict oldest to bound memory on the free tier.
+      if (uploads.size > MAX_UPLOADS) uploads.delete(uploads.keys().next().value as string);
+      return json(200, { kbId, names, chunks });
+    } catch (e) {
+      return json(400, { error: (e as Error).message });
+    }
   }
 
   if (req.method === "POST" && req.url === "/api/ask") {
-    let body = "";
-    req.on("data", (c) => (body += c));
-    req.on("end", async () => {
-      try {
-        const { question } = JSON.parse(body || "{}");
-        if (!question || typeof question !== "string") {
-          res.writeHead(400, { "content-type": "application/json" });
-          res.end(JSON.stringify({ error: "question required" }));
-          return;
-        }
-        const store = await storePromise;
-        const { answer, sources } = await answerQuestion(store, question, 4);
-        res.writeHead(200, { "content-type": "application/json" });
-        res.end(JSON.stringify({ answer, sources: [...new Set(sources.map((s) => s.source))] }));
-      } catch (e) {
-        res.writeHead(500, { "content-type": "application/json" });
-        res.end(JSON.stringify({ error: (e as Error).message }));
-      }
-    });
-    return;
+    try {
+      const { question, kbId } = JSON.parse(await readBody(req, 1024 * 1024));
+      if (!question || typeof question !== "string") return json(400, { error: "question required" });
+      const store = kbId && uploads.has(kbId) ? uploads.get(kbId)!.store : await defaultStore;
+      const { answer, sources } = await answerQuestion(store, question, 4);
+      return json(200, { answer, sources: [...new Set(sources.map((s) => s.source))] });
+    } catch (e) {
+      return json(500, { error: (e as Error).message });
+    }
   }
 
   res.writeHead(404, { "content-type": "text/plain" });
   res.end("not found");
 });
 
-server.listen(PORT, () => {
-  console.log(`RAG chat UI → http://localhost:${PORT}`);
-});
+server.listen(PORT, () => console.log(`RAG chat UI → http://localhost:${PORT}`));

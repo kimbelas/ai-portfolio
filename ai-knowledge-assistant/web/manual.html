@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>How it works — Acme Knowledge Assistant</title>
+    <style>
+      :root {
+        --bg: #0b0d12; --panel: #151922; --panel2: #1c2230; --text: #e8ecf4;
+        --muted: #9aa6bd; --accent: #5b9dff; --border: #262e3d;
+      }
+      @media (prefers-color-scheme: light) {
+        :root { --bg: #f6f8fc; --panel: #fff; --panel2: #f0f3fa; --text: #101423; --muted: #5b6a86; --accent: #2563eb; --border: #e2e8f2; }
+      }
+      * { box-sizing: border-box; }
+      body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.65 -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; display: flex; justify-content: center; }
+      .wrap { width: 100%; max-width: 760px; padding: 40px 22px 80px; }
+      h1 { font-size: 24px; margin: 0 0 6px; }
+      h2 { font-size: 17px; margin: 30px 0 8px; }
+      p, li { color: var(--text); }
+      .lede { color: var(--muted); margin: 0 0 8px; }
+      a { color: var(--accent); }
+      code { background: var(--panel2); border: 1px solid var(--border); border-radius: 5px; padding: 1px 6px; font-size: 13px; }
+      pre { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px; overflow-x: auto; font-size: 13px; line-height: 1.5; }
+      .card { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 16px 18px; margin: 10px 0; }
+      .muted { color: var(--muted); }
+      table { border-collapse: collapse; width: 100%; font-size: 14px; margin: 8px 0; }
+      th, td { border: 1px solid var(--border); padding: 6px 10px; text-align: left; }
+      th { color: var(--muted); font-weight: 600; }
+      .foot { color: var(--muted); font-size: 13px; margin-top: 32px; border-top: 1px solid var(--border); padding-top: 16px; }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <h1>How this works</h1>
+      <p class="lede">A plain-English tour of the Retrieval-Augmented Generation (RAG) system behind the chat. <a href="/">← back to the assistant</a></p>
+
+      <div class="card">
+        The core promise: <strong>it answers only from a set of documents, with citations, and says &ldquo;I don&rsquo;t know&rdquo; when the answer isn&rsquo;t in them.</strong> It never free-associates from the model&rsquo;s general knowledge. That&rsquo;s what makes it trustworthy for real docs.
+      </div>
+
+      <h2>The two phases</h2>
+      <p>A language model has no memory of your documents. RAG works by <em>finding</em> the relevant passages at question-time and <em>pasting them into the prompt</em>.</p>
+      <pre>INDEX (once, when docs change)          ASK (every question)
+  documents                               your question
+     │ split into chunks                     │ embed the question
+     ▼                                       ▼
+  chunks → embed each → store            retrieve the most relevant chunks
+  (vectors in a store)                   (hybrid search, then rerank)
+                                            │ build a grounded prompt
+                                            ▼
+                                         LLM writes an answer FROM those chunks,
+                                         cites them, or says "I don't know"</pre>
+
+      <h2>How relevant chunks are found</h2>
+      <p>Retrieval runs in three stages — each covers a weakness of the last:</p>
+      <ul>
+        <li><strong>Semantic search</strong> — the question and every chunk are turned into vectors (embeddings); closeness in that space means similar <em>meaning</em>. Great for paraphrases (&ldquo;can staff read my files&rdquo; ↔ &ldquo;zero-knowledge&rdquo;).</li>
+        <li><strong>Keyword search</strong> — plain term overlap. Catches exact tokens embeddings can miss (<code>SOC 2</code>, <code>AES-256</code>, a part number).</li>
+        <li><strong>Hybrid fusion (RRF)</strong> then a <strong>cross-encoder reranker</strong> — the two rankings are fused, and a second model re-scores each (question, chunk) pair together for a precise final order.</li>
+      </ul>
+
+      <h2>Why it won&rsquo;t answer outside the docs</h2>
+      <p>The model is instructed to use <strong>only</strong> the retrieved passages and to reply <em>&ldquo;I don&rsquo;t know based on the provided documents&rdquo;</em> when they don&rsquo;t contain the answer. Try asking the built-in demo <em>&ldquo;Who is the CEO?&rdquo;</em> — that fact isn&rsquo;t in the docs, so it declines instead of inventing one. Every answer also lists the <strong>source</strong> passages it used, so you can verify it.</p>
+
+      <h2>Bring your own documents</h2>
+      <p>Drop a <strong>PDF, Markdown, or Word (.docx)</strong> file on the home page. It&rsquo;s parsed, chunked, embedded, and stored as a <strong>separate, isolated knowledge base</strong> — the assistant then answers <em>only</em> from your files, never mixing in the built-in docs or anyone else&rsquo;s upload. Nothing is persisted server-side beyond the session.</p>
+
+      <h2>How it&rsquo;s measured</h2>
+      <p>Retrieval and answer quality are scored on a labeled eval set (not vibes). Adding the cross-encoder reranker moved the numbers measurably:</p>
+      <table>
+        <tr><th>retrieval</th><th>recall@1</th><th>recall@3</th></tr>
+        <tr><td>semantic</td><td>93%</td><td>93%</td></tr>
+        <tr><td>hybrid (RRF)</td><td>93%</td><td>93%</td></tr>
+        <tr><td><strong>hybrid + rerank</strong></td><td><strong>100%</strong></td><td><strong>100%</strong></td></tr>
+      </table>
+      <p class="muted">Answer correctness (LLM-judged) rose 93% → 100% — the reranker fixed a real retrieval miss.</p>
+
+      <h2>Under the hood</h2>
+      <ul>
+        <li><strong>Language:</strong> TypeScript (Node)</li>
+        <li><strong>Generation:</strong> Groq (OpenAI-compatible) — provider-agnostic</li>
+        <li><strong>Embeddings + reranker:</strong> on-device via Transformers.js (no data leaves for retrieval)</li>
+        <li><strong>Retrieval:</strong> hybrid (semantic + keyword, RRF) → cross-encoder rerank</li>
+        <li><strong>Store:</strong> in-memory vector store (graduates to pgvector)</li>
+      </ul>
+
+      <div class="foot">
+        Flagship 1 of a senior AI engineering portfolio. Code, evals, and architecture decisions:
+        <a href="https://github.com/kimbelas/ai-portfolio">github.com/kimbelas/ai-portfolio</a>. · <a href="/">← back to the assistant</a>
+      </div>
+    </div>
+  </body>
+</html>
