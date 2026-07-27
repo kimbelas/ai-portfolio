@@ -34,6 +34,27 @@ export async function retrieveSemantic(
 }
 
 /**
+ * Reciprocal Rank Fusion: merge several rankings of the same items into one.
+ * Rewards items that MULTIPLE rankers place near the top, using rank position
+ * (not raw scores), so no shared score scale is needed. Pure + deterministic —
+ * unit-tested in retrieve.test.ts.
+ */
+export function rrfFuse(rankings: StoredChunk[][], k: number, rrfK = 60): StoredChunk[] {
+  const scores = new Map<string, number>();
+  const byId = new Map<string, StoredChunk>();
+  for (const ranking of rankings) {
+    ranking.forEach((chunk, rank) => {
+      scores.set(chunk.id, (scores.get(chunk.id) ?? 0) + 1 / (rrfK + rank));
+      byId.set(chunk.id, chunk);
+    });
+  }
+  return [...scores.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, k)
+    .map(([id]) => byId.get(id)!);
+}
+
+/**
  * Hybrid retrieval: fuse the semantic ranking and the keyword ranking using
  * Reciprocal Rank Fusion (RRF). RRF rewards chunks that BOTH rankers place
  * near the top, and needs no shared score scale. Robust to paraphrased
@@ -47,21 +68,7 @@ export async function retrieveHybrid(
   const qVec = await embed(query);
   const semantic = store.search(qVec, store.size()).map((s) => s.chunk);
   const keyword = keywordRanking(store, query);
-
-  const RRF_K = 60;
-  const scores = new Map<string, number>();
-  const fuse = (ranking: StoredChunk[]) =>
-    ranking.forEach((chunk, rank) => {
-      scores.set(chunk.id, (scores.get(chunk.id) ?? 0) + 1 / (RRF_K + rank));
-    });
-  fuse(semantic);
-  fuse(keyword);
-
-  const byId = new Map(store.all().map((c) => [c.id, c]));
-  return [...scores.entries()]
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, k)
-    .map(([id]) => byId.get(id)!);
+  return rrfFuse([semantic, keyword], k);
 }
 
 /**

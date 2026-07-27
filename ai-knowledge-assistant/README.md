@@ -2,6 +2,8 @@
 
 **▶ [Live demo](https://acme-knowledge-assistant.onrender.com/)** — grounded, cited RAG chat (free host; first request ~1 min to wake).
 
+[![CI](https://github.com/kimbelas/ai-portfolio/actions/workflows/ci.yml/badge.svg)](https://github.com/kimbelas/ai-portfolio/actions/workflows/ci.yml)
+
 **Flagship 1 of a senior AI engineer portfolio.** A RAG (Retrieval-Augmented Generation) system — ask questions about a document set, get grounded, cited answers — built from first principles and *measured*, not demoed.
 
 > Built rung by rung. Numbered lessons in `src/learn/` teach one concept each; reusable pieces live in `src/lib/`; real documents live in `knowledge/`.
@@ -15,7 +17,10 @@ cp .env.example .env            # add GROQ_API_KEY (free: https://console.groq.c
 npm run ask -- "Can Acme staff read my files, and is it SOC 2 certified?"
 npm run web                     # browser chat UI → http://localhost:8787
 npm run eval                    # benchmark: recall@k (3 retrievers) + LLM-judged correctness
-npm run learn:01                # ... through learn:08, the guided build
+npm run eval:injection          # prompt-injection resistance (naive vs hardened)
+npm test                        # unit tests — deterministic, no API key or model download
+npm run typecheck               # tsc --noEmit
+npm run learn:01                # ... through learn:09, the guided build
 ```
 
 ## Benchmark
@@ -83,6 +88,6 @@ Answer correctness (LLM-judged): **93% → 100%** with reranking. The reranker f
 
 ## Status & roadmap
 
-**Done:** full pipeline (ingest → chunk → embed → hybrid retrieve → **rerank** → grounded/cited answer → refusal), eval harness with a real benchmark (recall@k + LLM-judge + refusal accuracy + **prompt-injection resistance**) + a [benchmark writeup](docs/blog/measuring-rag-quality.md), **prompt-injection defense** (instruction hierarchy + untrusted-context delimiting + upload-time detector), streaming + guardrail + cost meter, `ask` CLI, **browser chat UI deployed live** (`npm run web` / [onrender](https://acme-knowledge-assistant.onrender.com/)) with a `/manual` explainer and **bring-your-own-docs upload** (PDF/MD/DOCX, isolated per-session KB), 5 ADRs.
+**Done:** full pipeline (ingest → chunk → embed → hybrid retrieve → **rerank** → grounded/cited answer → refusal), eval harness with a real benchmark (recall@k + LLM-judge + refusal accuracy + **prompt-injection resistance**) + a [benchmark writeup](docs/blog/measuring-rag-quality.md), **prompt-injection defense** (instruction hierarchy + untrusted-context delimiting + upload-time detector), streaming + guardrail + cost meter, `ask` CLI, **browser chat UI deployed live** (`npm run web` / [onrender](https://acme-knowledge-assistant.onrender.com/)) with a `/manual` explainer and **bring-your-own-docs upload** (PDF/MD/DOCX, isolated per-session KB), 5 ADRs. **Unit-tested** (20 deterministic tests) + typechecked, with **GitHub Actions CI** on every push.
 
 **Production graduation (next):** pgvector (Docker) · larger corpus + eval set · faithfulness metric · persistent multi-user stores.

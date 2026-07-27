@@ -17,7 +17,9 @@
     "ask": "tsx src/cli/ask.ts",
     "eval": "tsx src/learn/07-evals.ts",
     "eval:injection": "tsx src/learn/09-injection.ts",
-    "web": "tsx src/web/server.ts"
+    "web": "tsx src/web/server.ts",
+    "typecheck": "tsc --noEmit",
+    "test": "node --import tsx --test src/lib/guardrails.test.ts src/lib/vectorStore.test.ts src/lib/chunk.test.ts src/lib/retrieve.test.ts src/lib/rag.test.ts src/lib/extract.test.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.110.0",

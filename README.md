@@ -1,5 +1,7 @@
 # AI Engineering Portfolio — Matt Belas
 
+[![CI](https://github.com/kimbelas/ai-portfolio/actions/workflows/ci.yml/badge.svg)](https://github.com/kimbelas/ai-portfolio/actions/workflows/ci.yml)
+
 **▶ Live demo:** [Acme Knowledge Assistant (RAG)](https://acme-knowledge-assistant.onrender.com/) — grounded, cited answers over a document set. *(Free host — the first request may take ~1 min to wake.)*
 
 Production-minded AI systems, built from first principles and **measured**, not demoed. TypeScript · provider-agnostic · free-tier stack (Groq + on-device models).
