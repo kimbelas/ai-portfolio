@@ -1,5 +1,7 @@
 # AI Engineering Portfolio — Matt Belas
 
+**▶ Live demo:** [Acme Knowledge Assistant (RAG)](https://acme-knowledge-assistant.onrender.com/) — grounded, cited answers over a document set. *(Free host — the first request may take ~1 min to wake.)*
+
 Production-minded AI systems, built from first principles and **measured**, not demoed. TypeScript · provider-agnostic · free-tier stack (Groq + on-device models).
 
 Each project is built as a "rung ladder" — one runnable step per concept — so the whole modern AI stack is assembled from parts, with the reasoning documented along the way.

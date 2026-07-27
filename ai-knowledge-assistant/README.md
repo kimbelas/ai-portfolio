@@ -1,5 +1,7 @@
 # AI Knowledge Assistant
 
+**▶ [Live demo](https://acme-knowledge-assistant.onrender.com/)** — grounded, cited RAG chat (free host; first request ~1 min to wake).
+
 **Flagship 1 of a senior AI engineer portfolio.** A RAG (Retrieval-Augmented Generation) system — ask questions about a document set, get grounded, cited answers — built from first principles and *measured*, not demoed.
 
 > Built rung by rung. Numbered lessons in `src/learn/` teach one concept each; reusable pieces live in `src/lib/`; real documents live in `knowledge/`.
