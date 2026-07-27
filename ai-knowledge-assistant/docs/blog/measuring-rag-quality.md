@@ -1,4 +1,4 @@
-# Measuring RAG quality: 93% → 100% recall with a reranker (and proving it won't hallucinate)
+# Measuring RAG quality: 93% → 100% recall with a reranker (and showing it refuses questions the docs don't cover)
 
 Anyone can wire up a RAG chatbot in an afternoon: embed some docs, do a
 cosine-similarity search, stuff the top chunks into a prompt. It demos well.
@@ -49,16 +49,20 @@ Plus 5 **negative** questions that are deliberately *not* in the corpus.
 appear in the top-k? This isolates the retriever from the generator — if recall
 is bad, no amount of prompt engineering saves you.
 
-**2. Answer correctness** (LLM-as-judge). A separate model grades the final
-answer PASS/FAIL against the gold fact. This catches the case where retrieval
-was fine but the model still garbled the answer.
+**2. Answer correctness** (LLM-as-judge). A second LLM call — the *same*
+Llama-3.3-70B model, in a strict grader role — scores the final answer PASS/FAIL
+against the gold fact. This catches the case where retrieval was fine but the
+model still garbled the answer. (Same-model grading is a known weakness; see the
+caveats.)
 
-**3. Refusal accuracy** (the part most demos skip). Over the 5 out-of-doc
-questions, does it correctly decline? The strongest case here is
+**3. Refusal accuracy** (the part most demos skip). Over 5 out-of-doc questions,
+does it correctly decline? The strongest case is
 *"What is the capital of France?"* — the model **knows** the answer from
 pre-training. A grounded RAG system must refuse anyway, because the answer isn't
-in the provided documents. This metric is the whole trust proposition: it's what
-lets a client point the tool at their own contract and believe the citations.
+in the provided documents. This goes to the heart of the trust proposition —
+it's what lets a client point the tool at their own contract and believe the
+citations — though 5 questions is a thin basis, and the check is a substring
+match for the enforced refusal phrase, so treat it as a smoke test, not a proof.
 
 ## Results
 
@@ -76,18 +80,24 @@ Running `npm run eval` against the hard corpus:
 | answer correctness — **hybrid+rerank** | **100% (15/15)** |
 | refusal accuracy (out-of-doc)          | **100% (5/5)** |
 
+Note the middle row: **hybrid RRF didn't move recall** on this small set —
+semantic search already surfaced the right doc 93% of the time. RRF still earns
+its place (it guards exact-term queries like `AES-256` or a part number that
+embeddings can blur), but on *this* corpus the **cross-encoder reranker** is what
+actually moved the number.
+
 ## The failure that survived — and how I fixed it
 
 At the hybrid stage, one question failed end-to-end: **"Does Acme support SAML
 single sign-on?"**
 
-I traced it instead of guessing. The retrieval trace showed the top-k was full
-of high-similarity `security` and `two-factor` chunks — all *about*
-authentication, none mentioning SAML. The one chunk that actually answered the
-question (in `enterprise.md`) ranked #4, just outside the k=3 window. So the
-generator did exactly the right thing with what it was given: it **refused**,
-because SAML genuinely wasn't in its context. A correct behavior driven by a
-retrieval miss.
+I traced it instead of guessing. The top-ranked chunks were high-similarity
+`security` and `two-factor` passages — all *about* authentication, none
+mentioning SAML. The one chunk that actually states SAML support (in
+`enterprise.md`) fell **outside the top-k the generator was given**. So the
+generator did exactly the right thing with what it had: it **refused**, because
+SAML genuinely wasn't in its context. A correct behavior driven by a retrieval
+miss — confirmed by the recall@1 metric, which was below 100% until the fix.
 
 The fix wasn't a bigger k (that dilutes the prompt and invites other errors).
 It was a **cross-encoder reranker**: hybrid search casts a wide net (top-15),
@@ -100,10 +110,13 @@ answer correctness went to 100%. That's [ADR-0004](../adr/0004-cross-encoder-rer
 
 Numbers without caveats are marketing, so:
 
-- **The LLM judge is noisy.** On an earlier run it false-*failed* a correct
-  "payment methods" answer that listed the methods in a different order than the
-  gold fact. I trust the *trend* (hybrid+rerank beats hybrid) more than any
-  single percentage point. A stricter rubric or a second judge would tighten this.
+- **The LLM judge is noisy — and it's the same model grading itself.** The
+  grader is the same Llama-3.3-70B used to generate, in a strict PASS/FAIL role,
+  so it can share the generator's blind spots (self-preference bias). On an
+  earlier run it false-*failed* a correct "payment methods" answer that listed
+  the methods in a different order than the gold fact. I trust the *trend*
+  (hybrid+rerank beats hybrid) more than any single point; an independent judge
+  model and a stricter rubric would tighten this.
 - **The corpus is small** (15 docs, 15+5 questions). These are directional
   results on one domain, not a leaderboard claim. The harness is built to grow —
   more docs and questions is the obvious next step.

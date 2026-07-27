@@ -108,6 +108,7 @@
       const examples = document.getElementById("examples");
 
       let activeKb = null; // null = built-in Acme docs
+      const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 
       // ---- ask ----
       examples.addEventListener("click", (e) => {
@@ -134,13 +135,14 @@
             body: JSON.stringify({ question, kbId: activeKb }),
           });
           const data = await r.json();
+          if (r.status === 410) { resetKb(); throw new Error(data.error || "upload expired — please upload the file again"); }
           if (data.error) throw new Error(data.error);
           card.querySelector(".a").textContent = data.answer;
           if (data.sources && data.sources.length) {
             const s = document.createElement("div");
             s.className = "sources";
             s.innerHTML = '<span class="label">sources</span>' +
-              data.sources.map((x) => '<span class="src">' + x + "</span>").join("");
+              data.sources.map((x) => '<span class="src">' + esc(x) + "</span>").join("");
             card.appendChild(s);
           }
         } catch (err) {
@@ -182,11 +184,11 @@
           examples.style.display = "none";
           input.placeholder = "Ask a question about your uploaded files…";
           kbbar.innerHTML = 'Answering <strong>only</strong> from your files: <strong>' +
-            data.names.join(", ") + '</strong> (' + data.chunks + ' chunks)' +
+            esc(data.names.join(", ")) + '</strong> (' + data.chunks + ' chunks)' +
             '<span class="reset" id="reset">use built-in docs</span>';
           document.getElementById("reset").addEventListener("click", resetKb);
         } catch (err) {
-          kbbar.innerHTML = 'Upload failed: ' + err.message + ' <span class="reset" id="reset">use built-in docs</span>';
+          kbbar.innerHTML = 'Upload failed: ' + esc(err.message) + ' <span class="reset" id="reset">use built-in docs</span>';
           const rb = document.getElementById("reset"); if (rb) rb.addEventListener("click", resetKb);
         }
       }
