@@ -183,9 +183,12 @@
           activeKb = data.kbId;
           examples.style.display = "none";
           input.placeholder = "Ask a question about your uploaded files…";
+          const warn = data.flagged
+            ? '<div style="margin-top:6px;color:#e0a33e">⚠ This document contains text that looks like a prompt-injection attempt. It is indexed as <strong>data only</strong> — the assistant will not follow instructions hidden inside it.</div>'
+            : '';
           kbbar.innerHTML = 'Answering <strong>only</strong> from your files: <strong>' +
             esc(data.names.join(", ")) + '</strong> (' + data.chunks + ' chunks)' +
-            '<span class="reset" id="reset">use built-in docs</span>';
+            '<span class="reset" id="reset">use built-in docs</span>' + warn;
           document.getElementById("reset").addEventListener("click", resetKb);
         } catch (err) {
           kbbar.innerHTML = 'Upload failed: ' + esc(err.message) + ' <span class="reset" id="reset">use built-in docs</span>';

@@ -24,6 +24,7 @@ import { chunkText } from "../lib/chunk";
 import { embed } from "../lib/embeddings";
 import { InMemoryVectorStore } from "../lib/vectorStore";
 import { extractText } from "../lib/extract";
+import { detectInjection } from "../lib/guardrails";
 
 const WEB = resolve(dirname(fileURLToPath(import.meta.url)), "../../web");
 const INDEX_HTML = readFileSync(resolve(WEB, "index.html"), "utf8");
@@ -85,6 +86,7 @@ const server = createServer(async (req, res) => {
 
       const store = new InMemoryVectorStore();
       const names: string[] = [];
+      const injectionLabels = new Set<string>();
       let chunks = 0;
       let totalChars = 0;
       for (const f of files) {
@@ -93,6 +95,10 @@ const server = createServer(async (req, res) => {
         totalChars += text.length;
         if (totalChars > MAX_TEXT_CHARS)
           return json(413, { error: "Uploaded documents are too large to index on the free tier (~400k characters max). Try a smaller file." });
+        // Tripwire (not a filter): warn if the doc contains injection-like text.
+        // It's still indexed — the real defense is the grounding prompt's
+        // instruction hierarchy (lib/rag.ts), which treats context as data.
+        for (const label of detectInjection(text).labels) injectionLabels.add(label);
         const source = String(f.name ?? "file").replace(/\.[^.]+$/, "");
         for (const c of chunkText(source, text)) {
           if (chunks >= MAX_CHUNKS_PER_UPLOAD)
@@ -108,7 +114,8 @@ const server = createServer(async (req, res) => {
       uploads.set(kbId, { store, names });
       // Evict oldest to bound memory on the free tier.
       if (uploads.size > MAX_UPLOADS) uploads.delete(uploads.keys().next().value as string);
-      return json(200, { kbId, names, chunks });
+      if (injectionLabels.size) console.warn("[upload] injection-like text flagged:", [...injectionLabels]);
+      return json(200, { kbId, names, chunks, flagged: injectionLabels.size > 0, injectionLabels: [...injectionLabels] });
     } catch (e) {
       return json(400, { error: (e as Error).message });
     }

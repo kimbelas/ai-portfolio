@@ -13,8 +13,10 @@
     "learn:06": "tsx src/learn/06-rag-loop.ts",
     "learn:07": "tsx src/learn/07-evals.ts",
     "learn:08": "tsx src/learn/08-production.ts",
+    "learn:09": "tsx src/learn/09-injection.ts",
     "ask": "tsx src/cli/ask.ts",
     "eval": "tsx src/learn/07-evals.ts",
+    "eval:injection": "tsx src/learn/09-injection.ts",
     "web": "tsx src/web/server.ts"
   },
   "dependencies": {
