@@ -1,0 +1,16 @@
+# Render Blueprint — free Node web service for the Flagship 1 RAG chat UI.
+# Deploys the ai-knowledge-assistant subfolder straight from this repo.
+services:
+  - type: web
+    name: acme-knowledge-assistant
+    runtime: node
+    rootDir: ai-knowledge-assistant
+    plan: free
+    buildCommand: npm install
+    startCommand: npm run web
+    autoDeploy: true
+    envVars:
+      - key: NODE_VERSION
+        value: "20"
+      - key: GROQ_API_KEY
+        sync: false # set this in the Render dashboard (secret)

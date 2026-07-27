@@ -1,91 +1,43 @@
-# Deploy to Hugging Face Spaces (free) — step by step
+# Deploy for free — Render
 
-This deploys the RAG web UI as a **Docker Space** on Hugging Face's free CPU tier.
-No prior HF experience needed — follow these in order. Everything you push lives
-in a separate git repo that HF hosts (the "Space").
+Hugging Face's **Docker** Spaces now require billing (only Gradio/Streamlit/Static are free). This app is a **Node server with on-device models**, so the simplest **free, no-rewrite** host is **Render** — it deploys straight from your GitHub repo (works with a private repo, no file-copying).
 
-> **What you get:** a public URL like `https://huggingface.co/spaces/<you>/acme-knowledge-assistant`
-> running the chat UI. First load takes ~1 minute (cold start + one-time model download); it's instant after that until the Space sleeps from inactivity.
+> **What you get:** a public URL like `https://acme-knowledge-assistant.onrender.com` running the chat UI. First load ~1 min (models download once); free instances sleep after ~15 min idle and wake on the next visit.
 
 ---
 
-## 1. Create a Hugging Face account + access token
+## Option A — Blueprint (recommended, one file)
 
-1. Sign up at **https://huggingface.co/join** (free).
-2. Create a **write** token: **https://huggingface.co/settings/tokens** → **New token** → Type: **Write** → create it → **copy it** (you'll paste it as your git password later). Treat it like a password.
+The repo already contains `render.yaml`, so Render can set everything up automatically.
 
-## 2. Create the Space
+1. Sign up at **https://render.com** using **GitHub** (authorize access to your repositories, including private ones).
+2. Dashboard → **New +** → **Blueprint**.
+3. Select the **`ai-portfolio`** repository. Render reads `render.yaml` and shows a web service named `acme-knowledge-assistant`.
+4. It will prompt for the **`GROQ_API_KEY`** value → paste your Groq key (from https://console.groq.com/keys).
+5. Click **Apply**. Render builds (`npm install`) and starts it. When it's live, open the `…onrender.com` URL shown at the top.
 
-1. Go to **https://huggingface.co/new-space**.
-2. **Owner:** you · **Space name:** `acme-knowledge-assistant`
-3. **License:** optional (e.g. MIT).
-4. **Select the Space SDK:** **Docker** → template **Blank**.
-5. **Hardware:** **CPU basic · 2 vCPU · 16 GB · FREE**.
-6. **Visibility:** **Public** (so it's linkable on your résumé).
-7. Click **Create Space**. You now have an (empty) git repo at
-   `https://huggingface.co/spaces/<you>/acme-knowledge-assistant`.
+## Option B — Manual (dashboard clicks, no Blueprint)
 
-## 3. Add your Groq API key as a secret
+1. render.com → **New +** → **Web Service** → connect the **`ai-portfolio`** repo.
+2. **Root Directory:** `ai-knowledge-assistant`
+3. **Language / Runtime:** **Node**
+4. **Build Command:** `npm install`
+5. **Start Command:** `npm run web`
+6. **Instance Type:** **Free**
+7. **Environment** → **Add Environment Variable:** `GROQ_API_KEY` = your Groq key.
+8. **Create Web Service** → wait for the build → open the URL.
 
-In the new Space: **Settings** → **Variables and secrets** → **New secret**:
-- **Name:** `GROQ_API_KEY`
-- **Value:** your Groq key (from https://console.groq.com/keys)
-
-(Secrets are injected as environment variables at runtime — never commit the key.)
-
-## 4. Push the app to the Space
-
-Run these in **PowerShell**. Replace `<you>` with your HF username.
-
-```powershell
-# a) Clone the empty Space repo somewhere OUTSIDE the portfolio folder
-cd C:\Users\belas\Documents
-git clone https://huggingface.co/spaces/<you>/acme-knowledge-assistant hf-space
-
-# b) Copy the app into it (excludes node_modules, .env, .git, .cache)
-robocopy "C:\Users\belas\Documents\development\ai-portfolio\ai-knowledge-assistant" "C:\Users\belas\Documents\hf-space" /E /XD node_modules .git .cache /XF .env
-
-# c) Commit + push
-cd C:\Users\belas\Documents\hf-space
-git add -A
-git commit -m "Deploy Acme Knowledge Assistant"
-git push
-```
-
-When `git push` asks for credentials:
-- **Username:** your Hugging Face username
-- **Password:** paste the **write token** from step 1 (not your account password)
-
-## 5. Watch it build
-
-On the Space page, open the **Logs** tab. HF builds the `Dockerfile`
-(`npm install`, ~2–4 min), then starts the server. When you see
-`RAG chat UI → http://localhost:7860`, switch to the **App** tab.
-
-First question takes ~1 minute (the embedding + reranker models download once).
-After that it's fast. Try: *"Is Acme HIPAA compliant?"* or *"What is the API rate limit?"*
+The server automatically uses the port Render provides — nothing to configure.
 
 ---
 
-## Updating later
+## Note on Hugging Face (if you'd rather host there)
 
-Re-copy and push again:
-
-```powershell
-robocopy "C:\Users\belas\Documents\development\ai-portfolio\ai-knowledge-assistant" "C:\Users\belas\Documents\hf-space" /E /XD node_modules .git .cache /XF .env
-cd C:\Users\belas\Documents\hf-space
-git add -A; git commit -m "update"; git push
-```
+HF free tiers are **Gradio / Streamlit / Static (Python)** only. To deploy on HF for free, I'd **rewrite this as a Gradio (Python) Space** (sentence-transformers for embeddings + reranking, Groq for generation). More work, but it keeps you on HF and adds Python to the portfolio — just say the word.
 
 ## Troubleshooting
 
-- **Build fails / red status:** open **Logs**, copy the error — most issues are a
-  missing system lib or a Node version quirk; easy to patch in the `Dockerfile`.
-- **App loads but every answer errors:** the `GROQ_API_KEY` secret is missing or
-  wrong (step 3). Re-check it, then **Settings → Factory reboot**.
-- **"Application startup timeout":** the model download on first boot was slow —
-  reboot the Space; it caches after the first successful start.
-- **It went to sleep:** free Spaces sleep after inactivity; the next visit wakes
-  it (~1 min). That's normal for a free demo.
-- **Out of memory:** shouldn't happen on the 16 GB free tier; if it does, we can
-  switch the embedding model to a quantized build.
+- **Build fails / red status:** open Render's **Logs**, copy the error — usually a quick `render.yaml` or dependency fix.
+- **App loads but every answer errors:** the `GROQ_API_KEY` env var is missing or wrong. Fix it in Render → **Environment**, then it redeploys.
+- **Out of memory** (free tier is 512 MB): tell me and I'll switch the embedding model to a smaller quantized build (`EMBED_DTYPE=q8`) to cut RAM.
+- **It went to sleep:** free instances sleep when idle; the next visit wakes it (~30–60s). Normal for a free demo — a paid instance or a keep-warm ping removes it.
