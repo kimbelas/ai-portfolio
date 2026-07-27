@@ -137,6 +137,31 @@ npm run eval
 Embeddings and the reranker run **on-device** via Transformers.js — no data
 leaves the machine for retrieval; only the final generation call hits the LLM.
 
+## Faithfulness: does every claim trace to the source?
+
+Correctness asks "is the answer right?". *Faithfulness* asks something stricter:
+is **every claim** in the answer actually supported by the retrieved context, or
+did the model smuggle in outside knowledge? It's the canonical RAG hallucination
+metric (RAGAS-style), computed from first principles (`npm run eval:faithfulness`):
+generate the answer → decompose it into atomic claims (LLM) → judge each claim
+against the retrieved context (LLM) → supported / total.
+
+The production pipeline scores **97% (28/29 claims grounded)** over 8 questions.
+The one miss is the instructive part: an SLA answer made a claim the retrieved
+chunk didn't actually contain — exactly the subtle over-reach this metric exists
+to catch.
+
+I also tested whether *relaxing* the grounding instruction changed the number.
+It didn't (98%) — because the retrieved context is already on-topic and the model
+is conservative, so it stays close to the passages either way. That's an honest
+negative result: on this corpus faithfulness earns its keep as a **hallucination
+monitor / regression guard**, not as a knob that separated the two prompts. With
+a noisier corpus or a weaker retriever the gap would open — and the harness is
+already there to measure it when it does.
+
+(Two LLM-judged steps, so it's noisy; small question set; single run. Trust the
+level and the trend, not the last point.)
+
 ## Adversarial: resisting prompt injection
 
 The moment the app accepted **user uploads**, the retrieved passages became
