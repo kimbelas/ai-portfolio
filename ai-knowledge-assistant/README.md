@@ -30,6 +30,8 @@ npm run learn:01                # ... through learn:08, the guided build
 
 Answer correctness (LLM-judged): **93% → 100%** with reranking. The reranker fixed a real retrieval miss — a SAML-SSO question whose source doc ranked outside the top-k, where the grounded pipeline had correctly *refused* rather than hallucinate. See `docs/adr/0004`. *(LLM-as-judge is itself noisy — trust the trend, not any single point.)*
 
+**Refusal accuracy: 100% (5/5).** Over 5 out-of-doc questions — including *"What is the capital of France?"*, which the model knows from pre-training — it declines every one instead of answering, because the fact isn't in the provided documents. That's the whole trust proposition. Full method, failure analysis, and honest caveats: **[docs/blog/measuring-rag-quality.md](docs/blog/measuring-rag-quality.md)**.
+
 ## The learning ladder
 
 | Rung | Concept | Script |
@@ -78,6 +80,6 @@ Answer correctness (LLM-judged): **93% → 100%** with reranking. The reranker f
 
 ## Status & roadmap
 
-**Done:** full pipeline (ingest → chunk → embed → hybrid retrieve → **rerank** → grounded/cited answer → refusal), eval harness with a real benchmark, streaming + guardrail + cost meter, `ask` CLI, **browser chat UI** (`npm run web`), 4 ADRs.
+**Done:** full pipeline (ingest → chunk → embed → hybrid retrieve → **rerank** → grounded/cited answer → refusal), eval harness with a real benchmark (recall@k + LLM-judge + refusal accuracy) + a [benchmark writeup](docs/blog/measuring-rag-quality.md), streaming + guardrail + cost meter, `ask` CLI, **browser chat UI deployed live** (`npm run web` / [onrender](https://acme-knowledge-assistant.onrender.com/)) with a `/manual` explainer and **bring-your-own-docs upload** (PDF/MD/DOCX, isolated per-session KB), 4 ADRs.
 
-**Production graduation (next):** pgvector (Docker) · PDF ingestion · larger corpus + eval set · **deploy the web UI** (host) · blog post.
+**Production graduation (next):** pgvector (Docker) · larger corpus + eval set · faithfulness metric · persistent multi-user stores.

@@ -40,6 +40,17 @@ const DATASET: EvalCase[] = [
   { question: "Can I restore a whole folder from the mobile app?", goldSources: ["mobile"], goldFact: "No — folder restore is desktop-only" },
 ];
 
+// Negative cases: questions NOT answerable from the corpus. Correct behavior is
+// to REFUSE ("I don't know…") — never guess, and never answer from the model's
+// own world knowledge (e.g. the capital of France).
+const NEGATIVES: string[] = [
+  "Who is Acme's CEO?",
+  "What is the capital of France?",
+  "What was Acme's revenue last quarter?",
+  "Does Acme sell a coffee machine?",
+  "What is my current account balance?",
+];
+
 type Retriever = (store: InMemoryVectorStore, q: string, k: number) => Promise<{ source: string }[]>;
 
 const RETRIEVAL_CONFIGS: { name: string; retrieve: Retriever }[] = [
@@ -96,6 +107,17 @@ async function main() {
     console.log(`answer correctness (${ac.name}): ${Math.round((correct / n) * 100)}% (${correct}/${n})`);
     if (fails.length) console.log("  failed:" + fails.map((f) => `\n   - ${f}`).join(""));
   }
+
+  // --- 3. Refusal accuracy: does it decline questions the docs don't cover? ---
+  let refused = 0;
+  const leaked: string[] = [];
+  for (const q of NEGATIVES) {
+    const { answer } = await answerQuestion(store, q, 4);
+    if (/don.?t know|do not know/i.test(answer)) refused++;
+    else leaked.push(`${q} -> ${answer.slice(0, 70)}`);
+  }
+  console.log(`\nrefusal accuracy (out-of-doc questions): ${Math.round((refused / NEGATIVES.length) * 100)}% (${refused}/${NEGATIVES.length})`);
+  if (leaked.length) console.log("  LEAKED (answered instead of refusing):" + leaked.map((l) => `\n   - ${l}`).join(""));
 }
 
 main().catch((e) => {
