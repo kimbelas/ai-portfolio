@@ -15,16 +15,18 @@
     "learn:08": "tsx src/learn/08-production.ts",
     "learn:09": "tsx src/learn/09-injection.ts",
     "learn:10": "tsx src/learn/10-faithfulness.ts",
+    "learn:11": "tsx src/learn/11-pgvector.ts",
     "ask": "tsx src/cli/ask.ts",
     "eval": "tsx src/learn/07-evals.ts",
     "eval:injection": "tsx src/learn/09-injection.ts",
     "eval:faithfulness": "tsx src/learn/10-faithfulness.ts",
     "web": "tsx src/web/server.ts",
     "typecheck": "tsc --noEmit",
-    "test": "node --import tsx --test src/lib/guardrails.test.ts src/lib/vectorStore.test.ts src/lib/chunk.test.ts src/lib/retrieve.test.ts src/lib/rag.test.ts src/lib/extract.test.ts src/lib/faithfulness.test.ts"
+    "test": "node --import tsx --test src/lib/guardrails.test.ts src/lib/vectorStore.test.ts src/lib/chunk.test.ts src/lib/retrieve.test.ts src/lib/rag.test.ts src/lib/extract.test.ts src/lib/faithfulness.test.ts src/lib/pgVectorStore.test.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.110.0",
+    "@electric-sql/pglite": "0.2.17",
     "@huggingface/transformers": "^4.2.0",
     "dotenv": "^17.4.2",
     "mammoth": "^1.12.0",

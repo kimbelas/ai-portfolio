@@ -21,7 +21,8 @@ npm run eval:injection          # prompt-injection resistance (naive vs hardened
 npm run eval:faithfulness       # per-claim groundedness (RAGAS-style)
 npm test                        # unit tests — deterministic, no API key or model download
 npm run typecheck               # tsc --noEmit
-npm run learn:01                # ... through learn:10, the guided build
+npm run learn:11                # graduate the store to pgvector (embedded via PGlite — no Docker)
+npm run learn:01                # ... through learn:11, the guided build
 ```
 
 ## Benchmark
@@ -56,6 +57,7 @@ Answer correctness (LLM-judged): **93% → 100%** with reranking. The reranker f
 | 8 | Production — streaming, latency meter, guardrail | `src/learn/08-production.ts` |
 | 9 | Adversarial — indirect prompt-injection defense + resistance eval | `src/learn/09-injection.ts` |
 | 10 | Faithfulness — per-claim groundedness (RAGAS-style) | `src/learn/10-faithfulness.ts` |
+| 11 | Persistence — graduate the store to Postgres + pgvector (embedded, no Docker) | `src/learn/11-pgvector.ts` |
 
 ## Architecture
 
@@ -83,15 +85,15 @@ Answer correctness (LLM-judged): **93% → 100%** with reranking. The reranker f
 
 ## Stack
 
-**Provider-agnostic by design.** Free-tier build: TypeScript · **Groq** (reasoning, OpenAI-compatible) · **local embeddings** + **cross-encoder reranker** (`@huggingface/transformers`, on-device) · in-memory vector store → graduates to **pgvector** · hybrid retrieval + reranking + an eval harness.
+**Provider-agnostic by design.** Free-tier build: TypeScript · **Groq** (reasoning, OpenAI-compatible) · **local embeddings** + **cross-encoder reranker** (`@huggingface/transformers`, on-device) · in-memory vector store **plus a real `pgvector` store** (`PgVectorStore`, embedded via PGlite — `<=>` cosine + HNSW ANN index; see rung 11 / ADR-0006) · hybrid retrieval + reranking + an eval harness.
 
 ## Docs
 
 - `docs/WALKTHROUGH.md` — how the system works, end to end
-- `docs/adr/` — architecture decisions (vector store, provider, hybrid retrieval, reranker, prompt-injection defense)
+- `docs/adr/` — architecture decisions (vector store, provider, hybrid retrieval, reranker, prompt-injection defense, pgvector persistence)
 
 ## Status & roadmap
 
-**Done:** full pipeline (ingest → chunk → embed → hybrid retrieve → **rerank** → grounded/cited answer → refusal), eval harness with a real benchmark (recall@k + LLM-judge + refusal accuracy + **prompt-injection resistance** + **faithfulness**) + a [benchmark writeup](docs/blog/measuring-rag-quality.md), **prompt-injection defense** (instruction hierarchy + untrusted-context delimiting + upload-time detector), streaming + guardrail + cost meter, `ask` CLI, **browser chat UI deployed live** (`npm run web` / [onrender](https://acme-knowledge-assistant.onrender.com/)) with a `/manual` explainer and **bring-your-own-docs upload** (PDF/MD/DOCX, isolated per-session KB), 5 ADRs. **Unit-tested** (25 deterministic tests) + typechecked, with **GitHub Actions CI** on every push.
+**Done:** full pipeline (ingest → chunk → embed → hybrid retrieve → **rerank** → grounded/cited answer → refusal), eval harness with a real benchmark (recall@k + LLM-judge + refusal accuracy + **prompt-injection resistance** + **faithfulness**) + a [benchmark writeup](docs/blog/measuring-rag-quality.md), **prompt-injection defense** (instruction hierarchy + untrusted-context delimiting + upload-time detector), streaming + guardrail + cost meter, `ask` CLI, **browser chat UI deployed live** (`npm run web` / [onrender](https://acme-knowledge-assistant.onrender.com/)) with a `/manual` explainer and **bring-your-own-docs upload** (PDF/MD/DOCX, isolated per-session KB), a **pgvector store** (`PgVectorStore`, rung 11 — real `<=>` cosine + HNSW, embedded via PGlite, tested in CI with zero infra; not yet the default backend, see ADR-0006), 6 ADRs. **Unit-tested** (27 deterministic tests) + typechecked, with **GitHub Actions CI** on every push.
 
 **Production graduation (next):** pgvector (Docker) · larger corpus + eval set · faithfulness metric · persistent multi-user stores.
