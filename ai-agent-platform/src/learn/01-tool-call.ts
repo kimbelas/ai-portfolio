@@ -33,6 +33,7 @@ async function main() {
   // 2. Execute what it asked for. Append the request to history first.
   messages.push(msg);
   for (const call of msg.tool_calls ?? []) {
+    if (call.type !== "function") continue; // OpenAI v6 tool_calls is a union; we only use function tools
     const args = JSON.parse(call.function.arguments); // arguments arrive as a JSON string
     const result = runTool(call.function.name, args);
     console.log(`\nExecuted ${call.function.name}(${JSON.stringify(args)}) -> ${result}`);

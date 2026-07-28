@@ -52,7 +52,7 @@ async function toolsForLLM(client: Client) {
 export async function askCodebase(
   client: Client,
   question: string,
-  opts: { verbose?: boolean } = {},
+  opts: { verbose?: boolean; onTool?: (name: string, args: any) => void } = {},
 ): Promise<string> {
   const tools = await toolsForLLM(client);
   const messages: any[] = [
@@ -69,6 +69,7 @@ export async function askCodebase(
 
     for (const call of msg.tool_calls) {
       const args = JSON.parse(call.function.arguments || "{}");
+      opts.onTool?.(call.function.name, args);
       if (opts.verbose) console.log(`  ↳ ${call.function.name}(${JSON.stringify(args)})`);
       const result = await client.callTool({ name: call.function.name, arguments: args });
       messages.push({ role: "tool", tool_call_id: call.id, content: textOf(result) });

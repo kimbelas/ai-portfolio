@@ -2,6 +2,8 @@
 
 **Flagship 3 of a senior AI engineer portfolio.** A dev assistant built on the **Model Context Protocol (MCP)** — an MCP **server** that exposes codebase tools over stdio (JSON-RPC), and an MCP **client/host** that discovers those tools and lets an LLM (Groq) use them to answer questions about a codebase, with `file:line` citations.
 
+[![CI](https://github.com/kimbelas/ai-portfolio/actions/workflows/ci.yml/badge.svg)](https://github.com/kimbelas/ai-portfolio/actions/workflows/ci.yml)
+
 > Built from first principles: understand the protocol (server ↔ client over stdio), then bridge MCP tools into an LLM tool-calling loop.
 
 ## The ladder
@@ -11,6 +13,7 @@
 | M1 | MCP server + client over stdio — discover & call tools (no LLM) | `src/server.ts` + `src/learn/01-client-basics.ts` |
 | M2 | LLM over MCP — Groq drives the server's tools | `src/learn/02-llm-over-mcp.ts` |
 | M3 | Codebase Q&A — cited answers over a sample repo | `src/learn/03-codebase-qa.ts` |
+| M4 | Evaluation — task success + tool-use + tool-selection + citation rate | `src/learn/04-evals.ts` |
 | — | Usable CLI | `src/cli/ask.ts` (`npm run ask -- "…"`) |
 
 ## Architecture
@@ -29,6 +32,19 @@
 
 The server exposes tools any MCP client could use; the host can drive any MCP server. That interoperability is the point of MCP.
 
+## Evaluation
+
+`npm run eval` asks a labelled set of questions whose answers are known from the sample repo, so grading is **deterministic — no LLM judge**:
+
+| metric | result |
+|---|---|
+| task success | **5/6** |
+| tool-use rate (inspected the repo) | **100%** |
+| tool-selection (appropriate tool) | **100%** |
+| file-citation rate | **100%** (on answered questions) |
+
+The 5 factual lookups pass cleanly. The 6th is adversarial — *"which relational database does it use?"* — where there is **no** positive answer (it's in-memory). Sometimes the agent correctly reports the absence; sometimes it over-searches for evidence that isn't there and hits its **step-budget guardrail** (a safe stop, not a hallucination). Surfacing that failure mode is the point of the harness. *(Small set, single run, stochastic.)* The dev-tool logic is also unit-tested (`npm test`) and typechecked in CI.
+
 ## Stack
 
 TypeScript · `@modelcontextprotocol/sdk` 1.29 (stdio transport) · Groq `openai/gpt-oss-120b` (OpenAI-compatible tool calling) · zod-validated tools. **Tool-reliability note:** open models on Groq occasionally emit malformed tool-call JSON (`tool_use_failed`); the host retries (see `docs/adr/0001-*`).
@@ -42,4 +58,7 @@ npm run learn:01       # MCP protocol: discover + call tools (no key needed)
 npm run learn:02       # LLM drives the MCP tools
 npm run learn:03       # codebase Q&A with citations
 npm run ask -- "Where are API keys validated, and what's the risk?"
+npm run eval           # codebase-QA eval: task success + tool-use + citation
+npm test               # unit tests (deterministic — reads the sample repo, no API key)
+npm run typecheck      # tsc --noEmit
 ```

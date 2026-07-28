@@ -12,7 +12,11 @@
     "learn:05": "tsx src/learn/05-hitl.ts",
     "learn:06": "tsx src/learn/06-guardrails.ts",
     "learn:07": "tsx src/learn/07-observability.ts",
-    "learn:08": "tsx src/learn/08-checkpoints.ts"
+    "learn:08": "tsx src/learn/08-checkpoints.ts",
+    "learn:09": "tsx src/learn/09-evals.ts",
+    "eval": "tsx src/learn/09-evals.ts",
+    "typecheck": "tsc --noEmit",
+    "test": "node --import tsx --test src/lib/tools.test.ts"
   },
   "dependencies": {
     "@langchain/core": "^1.2.3",

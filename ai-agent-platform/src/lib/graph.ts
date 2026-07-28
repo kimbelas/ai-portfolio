@@ -56,7 +56,8 @@ export function createAgent() {
 
       // Guardrail: timeout. Execute the tool (zod-validated by tool()).
       try {
-        const result = await withTimeout(TOOLS_BY_NAME[call.name].invoke(call.args), 10_000, call.name);
+        const tool = TOOLS_BY_NAME[call.name] as { invoke: (args: any) => Promise<unknown> };
+        const result = await withTimeout(tool.invoke(call.args), 10_000, call.name);
         out.push(new ToolMessage({ tool_call_id: id, content: String(result) }));
       } catch (err) {
         out.push(new ToolMessage({ tool_call_id: id, content: `Error running ${call.name}: ${(err as Error).message}` }));

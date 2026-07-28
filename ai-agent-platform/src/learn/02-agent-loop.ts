@@ -45,6 +45,7 @@ async function runAgent(task: string) {
 
     // Otherwise execute every requested tool and feed the results back.
     for (const call of msg.tool_calls) {
+      if (call.type !== "function") continue; // OpenAI v6 tool_calls is a union; we only use function tools
       const args = JSON.parse(call.function.arguments);
       const result = runTool(call.function.name, args);
       console.log(`[step ${step}] ${call.function.name}(${JSON.stringify(args)}) -> ${result}`);

@@ -9,7 +9,11 @@
     "learn:01": "tsx src/learn/01-client-basics.ts",
     "learn:02": "tsx src/learn/02-llm-over-mcp.ts",
     "learn:03": "tsx src/learn/03-codebase-qa.ts",
-    "ask": "tsx src/cli/ask.ts"
+    "learn:04": "tsx src/learn/04-evals.ts",
+    "eval": "tsx src/learn/04-evals.ts",
+    "ask": "tsx src/cli/ask.ts",
+    "typecheck": "tsc --noEmit",
+    "test": "node --import tsx --test src/lib/dev-tools.test.ts"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.29.0",
