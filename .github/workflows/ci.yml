@@ -60,3 +60,22 @@ jobs:
         run: npm run typecheck
       - name: Unit tests
         run: npm test
+
+  eval-gate:
+    name: ai-knowledge-assistant · eval regression gate (deterministic)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ai-knowledge-assistant
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Install dependencies
+        run: npm install
+      # Retrieval recall@k is deterministic (local embeddings + reranker, no LLM,
+      # no API key), so quality is enforced as a build invariant. Downloads the
+      # models on first run (~110MB); the gate retries once on a transient hiccup.
+      - name: Eval regression gate (recall@k floor)
+        run: npm run eval:ci

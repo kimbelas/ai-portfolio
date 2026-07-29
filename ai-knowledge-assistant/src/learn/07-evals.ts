@@ -16,42 +16,8 @@ import { buildKnowledgeBase } from "../lib/kb";
 import { retrieveSemantic, retrieveHybrid, retrieveReranked } from "../lib/retrieve";
 import { answerQuestion } from "../lib/rag";
 import { chat, MODEL } from "../lib/llm";
+import { DATASET, NEGATIVES } from "../lib/eval-dataset";
 import type { InMemoryVectorStore } from "../lib/vectorStore";
-
-interface EvalCase {
-  question: string;
-  goldSources: string[]; // any of these docs is an acceptable retrieval
-  goldFact: string;
-}
-
-const DATASET: EvalCase[] = [
-  { question: "How much does the Pro plan cost per month?", goldSources: ["plans"], goldFact: "$9 per month" },
-  { question: "Can Acme staff read my files?", goldSources: ["security", "encryption"], goldFact: "no — zero-knowledge; staff cannot read files" },
-  { question: "Is Acme HIPAA compliant?", goldSources: ["compliance"], goldFact: "No — HIPAA is not supported" },
-  { question: "Does Acme support SAML single sign-on?", goldSources: ["enterprise"], goldFact: "yes — SAML (and OIDC)" },
-  { question: "What is the API rate limit?", goldSources: ["api"], goldFact: "1000 requests per hour" },
-  { question: "Does Acme integrate with Slack?", goldSources: ["integrations"], goldFact: "yes — Slack notifications" },
-  { question: "What is the uptime SLA?", goldSources: ["sla"], goldFact: "99.9% monthly uptime (Business)" },
-  { question: "Is SMS supported for two-factor authentication?", goldSources: ["two-factor"], goldFact: "No — SMS 2FA is not supported (TOTP only)" },
-  { question: "Can I use my own encryption keys?", goldSources: ["encryption"], goldFact: "yes — customer-managed keys on Business" },
-  { question: "What payment methods can I use?", goldSources: ["billing"], goldFact: "credit/debit card and PayPal (and bank transfer for Business)" },
-  { question: "How long can I recover deleted files on the Free plan?", goldSources: ["backup-and-restore"], goldFact: "30 days" },
-  { question: "What happens to my data if I cancel my subscription?", goldSources: ["account"], goldFact: "read-only for 60 days, then deleted" },
-  { question: "Is Acme ISO 27001 certified?", goldSources: ["compliance"], goldFact: "yes — ISO 27001 certified" },
-  { question: "At how many seats do volume discounts start?", goldSources: ["enterprise"], goldFact: "25 seats" },
-  { question: "Can I restore a whole folder from the mobile app?", goldSources: ["mobile"], goldFact: "No — folder restore is desktop-only" },
-];
-
-// Negative cases: questions NOT answerable from the corpus. Correct behavior is
-// to REFUSE ("I don't know…") — never guess, and never answer from the model's
-// own world knowledge (e.g. the capital of France).
-const NEGATIVES: string[] = [
-  "Who is Acme's CEO?",
-  "What is the capital of France?",
-  "What was Acme's revenue last quarter?",
-  "Does Acme sell a coffee machine?",
-  "What is my current account balance?",
-];
 
 type Retriever = (store: InMemoryVectorStore, q: string, k: number) => Promise<{ source: string }[]>;
 

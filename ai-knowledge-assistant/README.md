@@ -19,6 +19,7 @@ npm run web                     # browser chat UI → http://localhost:8787
 npm run eval                    # benchmark: recall@k (3 retrievers) + LLM-judged correctness
 npm run eval:injection          # prompt-injection resistance (naive vs hardened)
 npm run eval:faithfulness       # per-claim groundedness (RAGAS-style)
+npm run eval:ci                 # deterministic recall@k regression gate (CI guard; no API key)
 npm test                        # unit tests — deterministic, no API key or model download
 npm run typecheck               # tsc --noEmit
 npm run learn:11                # graduate the store to pgvector (embedded via PGlite — no Docker)
@@ -94,6 +95,6 @@ Answer correctness (LLM-judged): **93% → 100%** with reranking. The reranker f
 
 ## Status & roadmap
 
-**Done:** full pipeline (ingest → chunk → embed → hybrid retrieve → **rerank** → grounded/cited answer → refusal), eval harness with a real benchmark (recall@k + LLM-judge + refusal accuracy + **prompt-injection resistance** + **faithfulness**) + a [benchmark writeup](docs/blog/measuring-rag-quality.md), **prompt-injection defense** (instruction hierarchy + untrusted-context delimiting + upload-time detector), streaming + relevance-floor guardrail + a **per-request token/cost readout** (returned by `/api/ask` and shown in the UI), `ask` CLI, **browser chat UI deployed live** (`npm run web` / [onrender](https://acme-knowledge-assistant.onrender.com/)) with a `/manual` explainer and **bring-your-own-docs upload** (PDF/MD/DOCX, isolated per-session KB), a **pgvector store** (`PgVectorStore`, rung 11 — real `<=>` cosine + HNSW, embedded via PGlite, tested in CI with zero infra; not yet the default backend, see ADR-0006), 6 ADRs. **Unit-tested** (27 deterministic tests) + typechecked, with **GitHub Actions CI** on every push.
+**Done:** full pipeline (ingest → chunk → embed → hybrid retrieve → **rerank** → grounded/cited answer → refusal), eval harness with a real benchmark (recall@k + LLM-judge + refusal accuracy + **prompt-injection resistance** + **faithfulness**) + a [benchmark writeup](docs/blog/measuring-rag-quality.md), **prompt-injection defense** (instruction hierarchy + untrusted-context delimiting + upload-time detector), streaming + relevance-floor guardrail + a **per-request token/cost readout** (returned by `/api/ask` and shown in the UI), `ask` CLI, **browser chat UI deployed live** (`npm run web` / [onrender](https://acme-knowledge-assistant.onrender.com/)) with a `/manual` explainer and **bring-your-own-docs upload** (PDF/MD/DOCX, isolated per-session KB), a **pgvector store** (`PgVectorStore`, rung 11 — real `<=>` cosine + HNSW, embedded via PGlite, tested in CI with zero infra; not yet the default backend, see ADR-0006), 6 ADRs. **Unit-tested** (27 deterministic tests) + typechecked, with **GitHub Actions CI** on every push — including a **deterministic eval-regression gate** (`npm run eval:ci`) that fails the build if retrieval recall@k drops below its floor (quality as a CI invariant, no API key needed).
 
 **Production graduation (next):** pgvector (Docker) · larger corpus + eval set · faithfulness metric · persistent multi-user stores.

@@ -29,4 +29,4 @@ See [`ai-portfolio-plan.md`](./ai-portfolio-plan.md) — the plan and the senior
 
 ## Stack
 
-TypeScript · Groq (OpenAI-compatible) · local embeddings (`@huggingface/transformers`) · hybrid retrieval + reranking · LangGraph.js · eval harnesses (all 3 flagships) · **unit tests + typecheck in CI across all 3 flagships** · pgvector (planned) · Docker + deploy (planned).
+TypeScript · Groq (OpenAI-compatible) · local embeddings (`@huggingface/transformers`) · hybrid retrieval + reranking · LangGraph.js · eval harnesses (all 3 flagships) · **unit tests + typecheck in CI across all 3 flagships (+ a deterministic eval-regression gate for RAG recall@k)** · pgvector (planned) · Docker + deploy (planned).
