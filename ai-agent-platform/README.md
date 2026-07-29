@@ -63,4 +63,28 @@ npm run learn:01       # ... through learn:09, the guided build
 npm run eval           # agent eval: tool-selection + task success + HITL gate
 npm test               # unit tests (deterministic — no API key)
 npm run typecheck      # tsc --noEmit
+npm run web            # serve the agent over HTTP (HITL approval) → http://localhost:8788
 ```
+
+## Deploy — the agent as an HTTP service
+
+`npm run web` serves the agent over HTTP with **human-in-the-loop approval across requests**:
+
+- `POST /api/agent` `{ message }` → runs the agent. If it wants a risky tool (`send_email`) it **pauses** and returns `{ status: "needs_approval", threadId, request }`.
+- `POST /api/agent/resume` `{ threadId, approved }` → resumes the paused run.
+- Every response includes the tool calls made and a **token/cost readout**. `GET /health` for liveness.
+
+Real, verified run (approve branch):
+
+```
+POST /api/agent  {"message":"Email dana@acme.com the price of the Business plan, subject Quote."}
+ → needs_approval: send_email(to=dana@acme.com, subject=Quote, body="…25 USD per month.")
+POST /api/agent/resume  {"threadId":"…","approved":true}
+ → "✅ Email sent to dana@acme.com…"   toolCalls: get_plan_price, send_email · 1190 tokens
+```
+
+Deny instead (`approved:false`) → *"the email was not sent"* and `send_email` never executes.
+
+**Deploy:** the repo's `render.yaml` includes a free Node service for this app (`rootDir: ai-agent-platform`, `npm run web`, `GROQ_API_KEY` as a dashboard secret) — the same one-blueprint flow as Flagship 1.
+
+**Honest limitation:** HITL state uses the graph's in-process `MemorySaver`, so a paused run resumes fine within a live instance but is lost if the instance restarts mid-approval. A durable checkpointer (SQLite/Postgres) is the production upgrade; it's deferred to keep the free-tier deploy free of native build dependencies.

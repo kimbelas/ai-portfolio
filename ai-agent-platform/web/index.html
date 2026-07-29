@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Agent Platform · LangGraph + HITL</title>
+    <style>
+      :root { --bg:#0b0d12; --panel:#151922; --panel2:#1c2230; --text:#e8ecf4; --muted:#9aa6bd; --accent:#5b9dff; --border:#262e3d; --warn:#e0a33e; --ok:#4ecb8d; }
+      @media (prefers-color-scheme: light) { :root { --bg:#f6f8fc; --panel:#fff; --panel2:#f0f3fa; --text:#101423; --muted:#5b6a86; --accent:#2563eb; --border:#e2e8f2; } }
+      * { box-sizing: border-box; }
+      body { margin:0; background:var(--bg); color:var(--text); font:15px/1.55 -apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif; display:flex; justify-content:center; }
+      .wrap { width:100%; max-width:720px; padding:32px 20px 64px; }
+      h1 { font-size:20px; margin:0 0 4px; } p.sub { color:var(--muted); margin:0 0 18px; }
+      a { color:var(--accent); }
+      .examples { display:flex; flex-wrap:wrap; gap:8px; margin-bottom:14px; }
+      .chip { background:var(--panel2); border:1px solid var(--border); border-radius:999px; padding:6px 12px; font-size:13px; cursor:pointer; }
+      form { display:flex; gap:8px; }
+      input[type=text] { flex:1; background:var(--panel); color:var(--text); border:1px solid var(--border); border-radius:10px; padding:12px 14px; font-size:15px; outline:none; }
+      button { background:var(--accent); color:#fff; border:0; border-radius:10px; padding:0 18px; font-size:15px; font-weight:600; cursor:pointer; }
+      button:disabled { opacity:.55; cursor:default; }
+      #out { margin-top:22px; display:flex; flex-direction:column; gap:14px; }
+      .card { background:var(--panel); border:1px solid var(--border); border-radius:12px; padding:16px 18px; }
+      .q { color:var(--muted); font-size:13px; margin-bottom:6px; }
+      .a { white-space:pre-wrap; }
+      .tools { margin-top:10px; display:flex; flex-wrap:wrap; gap:6px; }
+      .tool { background:var(--panel2); border:1px solid var(--border); border-radius:6px; padding:2px 8px; font-size:12px; color:var(--accent); }
+      .meta { color:var(--muted); font-size:11px; margin-top:8px; }
+      .approve { margin-top:12px; background:var(--panel2); border:1px solid var(--warn); border-radius:10px; padding:12px 14px; }
+      .approve .btns { margin-top:10px; display:flex; gap:8px; }
+      .approve button.deny { background:transparent; color:var(--text); border:1px solid var(--border); }
+      .dot { display:inline-block; width:7px; height:7px; border-radius:50%; background:var(--accent); animation:p 1s infinite; }
+      @keyframes p { 0%,100%{opacity:.3} 50%{opacity:1} }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <h1>Agent Platform</h1>
+      <p class="sub">A LangGraph agent with tools (calculator, plan pricing) and <strong>human-in-the-loop approval</strong> for risky actions (sending email). Input guardrails + a step budget run on every request.</p>
+
+      <div class="examples" id="examples">
+        <span class="chip">What is the Pro plan's cost for 2 years billed monthly?</span>
+        <span class="chip">What is 47 times 9?</span>
+        <span class="chip">Email jordan@acme.com the Pro plan price with subject "Pricing".</span>
+      </div>
+
+      <form id="form">
+        <input id="q" type="text" autocomplete="off" placeholder="Ask the agent to do something…" />
+        <button id="send" type="submit">Run</button>
+      </form>
+
+      <div id="out"></div>
+      <p class="meta">LangGraph.js · Groq · guardrails + HITL + step budget · token/cost readout. State is in-process (a durable checkpointer is the production upgrade).</p>
+    </div>
+
+    <script>
+      const form = document.getElementById("form"), input = document.getElementById("q");
+      const send = document.getElementById("send"), out = document.getElementById("out"), examples = document.getElementById("examples");
+      const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c]));
+
+      examples.addEventListener("click", (e) => { if (e.target.classList.contains("chip")) { input.value = e.target.textContent; run(); } });
+      form.addEventListener("submit", (e) => { e.preventDefault(); run(); });
+
+      function card(question) {
+        const el = document.createElement("div"); el.className = "card";
+        el.innerHTML = '<div class="q"></div><div class="body"><span class="dot"></span> running…</div>';
+        el.querySelector(".q").textContent = question; out.prepend(el); return el;
+      }
+      function renderDone(el, data) {
+        let html = '<div class="a">' + esc(data.answer || "") + "</div>";
+        if (data.toolCalls && data.toolCalls.length)
+          html += '<div class="tools">' + data.toolCalls.map((t) => '<span class="tool">' + esc(t.name) + "</span>").join("") + "</div>";
+        if (data.tokens) html += '<div class="meta">' + data.tokens.total + " tokens · ~$" + data.costEstimateUSD + " (frontier rates; $0 on Groq)</div>";
+        el.querySelector(".body").innerHTML = html;
+      }
+      function renderApproval(el, data) {
+        const r = data.request || {};
+        el.querySelector(".body").innerHTML =
+          '<div class="approve">⚠ The agent wants to run a risky tool: <strong>' + esc(r.tool || "?") + "</strong>" +
+          '<div class="meta">args: ' + esc(JSON.stringify(r.args || {})) + "</div>" +
+          '<div class="btns"><button class="ok">Approve</button><button class="deny">Deny</button></div></div>';
+        el.querySelector(".ok").addEventListener("click", () => resume(el, data.threadId, true));
+        el.querySelector(".deny").addEventListener("click", () => resume(el, data.threadId, false));
+      }
+      async function post(url, body) {
+        const r = await fetch(url, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
+        const d = await r.json(); if (d.error) throw new Error(d.error); return d;
+      }
+      async function run() {
+        const q = input.value.trim(); if (!q) return; input.value = ""; send.disabled = true;
+        const el = card(q);
+        try { const d = await post("/api/agent", { message: q }); d.status === "needs_approval" ? renderApproval(el, d) : renderDone(el, d); }
+        catch (e) { el.querySelector(".body").textContent = "Error: " + e.message; }
+        finally { send.disabled = false; input.focus(); }
+      }
+      async function resume(el, threadId, approved) {
+        el.querySelector(".body").innerHTML = '<span class="dot"></span> ' + (approved ? "approving…" : "cancelling…");
+        try { const d = await post("/api/agent/resume", { threadId, approved }); d.status === "needs_approval" ? renderApproval(el, d) : renderDone(el, d); }
+        catch (e) { el.querySelector(".body").textContent = "Error: " + e.message; }
+      }
+    </script>
+  </body>
+</html>
