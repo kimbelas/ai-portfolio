@@ -79,3 +79,23 @@ jobs:
       # models on first run (~110MB); the gate retries once on a transient hiccup.
       - name: Eval regression gate (recall@k floor)
         run: npm run eval:ci
+
+  platform:
+    name: platform · tests (shared ai-kit)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: platform
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Install dependencies
+        run: npm install
+      # Tests cover the self-contained ai-kit logic (guardrails). A full
+      # typecheck is intentionally omitted: platform composes Flagship 1 via
+      # cross-package relative imports, so tsc would need the sibling package's
+      # deps installed — that's the workspaces refactor tracked in its ADR.
+      - name: Unit tests
+        run: npm test

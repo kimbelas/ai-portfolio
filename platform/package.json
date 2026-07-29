@@ -6,7 +6,8 @@
   "description": "Platform layer — composes the flagships: a LangGraph agent (Flagship 2 tech) that consults the RAG knowledge base (Flagship 1) via a tool, on a shared ai-kit.",
   "scripts": {
     "probe": "tsx src/probe.ts",
-    "demo": "tsx src/learn/01-agent-with-rag.ts"
+    "demo": "tsx src/learn/01-agent-with-rag.ts",
+    "test": "node --import tsx --test src/ai-kit/guardrails.test.ts"
   },
   "dependencies": {
     "@langchain/core": "^1.2.3",
