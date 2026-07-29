@@ -44,6 +44,14 @@ export interface ChatTurn {
   content: string;
 }
 
+// Document-level / summary questions ("what is this about?", "summarize",
+// "what does this pdf do") aren't fact lookups — there's no single passage to
+// retrieve, so plain grounded QA (correctly, but unhelpfully) refuses. Detect
+// them and answer by summarizing a sample of the corpus instead.
+const OVERVIEW_RE =
+  /\b(summar(y|ise|ize)|overview|tl;?dr|the gist)\b|what('?s| is| does| do)\b.*\b(document|doc|pdf|file|report)\b.*\b(about|for|do|does|contain|cover|purpose)\b|what('?s| is)\s+(this|it)\s+(about|for)\b|what('?s| is)\s+(this|it)\s*\??$|what('?s| is)\s+(in|inside)\s+(this|it|here)\b|tell me (about|what)\b.*\b(this|it|document|doc|pdf|file)\b/i;
+export const isOverviewQuestion = (q: string) => OVERVIEW_RE.test(q.trim());
+
 /**
  * Multi-turn, streaming, grounded answer — the chat UI's backend.
  *
@@ -64,6 +72,29 @@ export async function* answerChatStream(
 ) {
   const latest = messages.at(-1)?.content ?? "";
   const prior = messages.slice(0, -1);
+
+  // Document-level / summary intent → summarize a representative sample of the
+  // corpus (grounded in those passages) rather than fact-retrieve + refuse.
+  if (isOverviewQuestion(latest)) {
+    yield { type: "status" as const, stage: "searching" as const };
+    const all = store.all();
+    const N = Math.min(10, all.length);
+    const step = Math.max(1, Math.floor(all.length / N || 1));
+    const sample: StoredChunk[] = [];
+    for (let i = 0; i < all.length && sample.length < N; i += step) sample.push(all[i]);
+    yield { type: "sources" as const, sources: sample };
+    const OVERVIEW_SYSTEM =
+      "You describe a document for the user using ONLY the sample passages provided. Write ONLY a 2–4 sentence summary in your own words of what the document is about and what it's for — do not quote, paste, or restate the passages. Do not use outside knowledge; if the passages are too sparse to tell, say what they do appear to cover.";
+    let usage: any = null;
+    for await (const delta of streamChat(
+      { system: OVERVIEW_SYSTEM, user: `Sample passages:\n${buildContext(sample)}\n\nWhat is this document about, and what is it for?`, maxTokens: 300 },
+      (u) => { usage = u; },
+    )) {
+      yield { type: "token" as const, text: delta };
+    }
+    yield { type: "done" as const, sources: sample, usage };
+    return;
+  }
 
   yield { type: "status" as const, stage: "searching" as const };
 

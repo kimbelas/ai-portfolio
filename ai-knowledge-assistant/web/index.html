@@ -161,6 +161,11 @@ Descale every 3 months with the Nimbus descaling solution. The machine carries a
         "Is Acme HIPAA compliant?", // out-of-doc → should refuse, proving isolation
       ];
       let usingSample = false;
+      const DOC_SUGGESTIONS = [
+        "What is this document about?",
+        "Summarize the key points.",
+        "What are the main topics it covers?",
+      ];
 
       // ---------- theme ----------
       const savedTheme = localStorage.getItem("theme");
@@ -174,15 +179,22 @@ Descale every 3 months with the Nimbus descaling solution. The machine carries a
 
       // ---------- empty state ----------
       function renderEmpty() {
+        let list;
         if (usingSample) {
           $("empty-h1").textContent = "Ask about the Nimbus Café One.";
           $("empty-p").innerHTML = "You loaded a sample document — answers come <em>only</em> from it. Ask a spec, or try an Acme question to watch it correctly say <em>“I don’t know.”</em>";
+          list = SAMPLE_SUGGESTIONS;
+        } else if (activeKb) {
+          $("empty-h1").textContent = "Ask about your document.";
+          $("empty-p").innerHTML = "Answers come <em>only</em> from your uploaded file — start with what it's about, or ask for specifics.";
+          list = DOC_SUGGESTIONS;
         } else {
           $("empty-h1").textContent = "Ask about Acme — answers only from the docs.";
           $("empty-p").innerHTML = "Retrieval-augmented, cited, and honest: it answers strictly from the source documents and says <em>“I don’t know”</em> when they don’t cover something. Or load a sample — or your own file — to query instead.";
+          list = SUGGESTIONS;
         }
         const s = $("suggest"); s.innerHTML = "";
-        (usingSample ? SAMPLE_SUGGESTIONS : SUGGESTIONS).forEach((text) => {
+        list.forEach((text) => {
           const b = document.createElement("button");
           b.innerHTML = '<span>' + esc(text) + '</span><span class="arr">→</span>';
           b.addEventListener("click", () => ask(text));
