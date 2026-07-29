@@ -3,6 +3,8 @@
 > **Goal:** A portfolio that makes an AI-first startup think *"this person can architect and ship production AI systems,"* not *"another ChatGPT wrapper."*
 >
 > **Owner:** Matt Belas — senior full-stack (Angular, Laravel, Node, TypeScript, enterprise). Positioning: **the rare full-stack engineer who builds AI-native products end-to-end.**
+>
+> **Status (2026-07-28) — read this first.** This is the *original* plan; the build deliberately diverged. Stack: a **free, provider-agnostic** setup — **Groq** (`gpt-oss`, `llama-3.3`) for generation + **on-device `@huggingface/transformers`** embeddings/reranker + **Render** deploy — *not* Claude/Vercel/Railway. Scale is **smaller** than the aspirational targets below (which are templates, not results). The real, reproducible numbers live in each flagship's README and in [`ai-knowledge-assistant/docs/blog/measuring-rag-quality.md`](ai-knowledge-assistant/docs/blog/measuring-rag-quality.md). §10 (interview narrative) has been rewritten to the **actual shipped** results — use that one.
 
 ---
 
@@ -50,7 +52,7 @@ If a repo doesn't advance one of those three claims, cut it.
 
 These are cross-cutting and they matter **more than the project list**. Bake them into every repo.
 
-1. **Evals with real numbers.** A committed dataset + a chart: *"hybrid search + reranking lifted answer accuracy 68% → 91% on 200 questions."* This is the #1 differentiator. Most candidates have zero of it.
+1. **Evals with real numbers.** A committed dataset + a benchmark you can defend. *(Illustrative target — NOT a result: "hybrid + reranking lifted accuracy X% → Y% on N questions.")* **Actual, shipped:** retrieval recall@1 **93% → 100%** by adding a cross-encoder reranker on a 15-question labeled set (see the blog), plus refusal, injection-resistance, and faithfulness metrics. This is the #1 differentiator. Most candidates have zero of it.
 2. **The production layer.** Streaming, retries + backoff, timeouts, structured-output validation (Zod), token/cost budgeting per request, response caching, rate limiting, **prompt-injection guardrails**, and **human-in-the-loop approval** for risky tool calls.
 3. **ADRs (Architecture Decision Records).** 1-page `docs/adr/NNNN-*.md` files: *"Why pgvector over Pinecone, and when I'd flip."* Judgment > code.
 4. **Observability.** Every LLM call traced; a dashboard or screenshots showing latency, tokens, cost per request. "I can debug an agent in prod."
@@ -179,9 +181,11 @@ Hiring managers skim. Diagram + numbers + deployed link in the first screenful =
 
 ## 10. Interview narrative (rehearse this)
 
-> *"I built three production AI systems sharing a common infra kit. The RAG assistant I optimized from 68% to 91% answer accuracy on a 200-question eval set by adding hybrid search and reranking — here's the benchmark. The agent platform runs on LangGraph with human-in-the-loop approval and prompt-injection guardrails; here's a trace of a failed run and how it degraded gracefully. The third is an MCP server I wrote from scratch. Across all three I tracked cost per request and kept it under half a cent by routing to smaller models where quality held."*
+> *"I built three AI systems on a free, provider-agnostic stack — Groq for generation, on-device embeddings — each measured, not just demoed. The RAG assistant: I lifted retrieval recall@1 from 93% to 100% by adding a cross-encoder reranker — I traced the one failing question, a SAML lookup, to a retrieval miss and fixed it. It also scores 100% refusal on out-of-doc questions, 97% faithfulness, and I hardened it against indirect prompt injection from 17% to 100% resistance. It's deployed on Render with a browser UI and bring-your-own-docs upload. The agent platform runs on LangGraph with human-in-the-loop approval for risky tools and guardrails, and I measure tool-selection accuracy and task success. The third is an MCP server I wrote from scratch over stdio, sandboxed, with deterministic codebase-QA evals. All three are unit-tested and typechecked in CI, and every non-obvious decision has an ADR."*
+>
+> *(Every number is reproducible: `npm run eval` / `eval:injection` / `eval:faithfulness`. Honest caveat I volunteer: the eval sets are small and single-domain, and the LLM judge is currently self-graded — scaling and an independent judge are the next work.)*
 
-That paragraph is the entire goal of this plan. Every task above exists to make it true and provable.
+That paragraph is the entire goal of this plan. Every task above exists to make it true and provable — and now it *is* true and provable.
 
 ---
 
