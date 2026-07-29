@@ -4,7 +4,9 @@ import { pipeline } from "@huggingface/transformers";
 let _embedder: any = null;
 async function getEmbedder() {
   if (!_embedder) {
-    _embedder = await pipeline("feature-extraction", "Xenova/all-MiniLM-L6-v2");
+    // q8 (int8-quantized) weights: smaller + faster on CPU, negligible quality
+    // loss for this model. Verified to keep the eval recall gate green.
+    _embedder = await pipeline("feature-extraction", "Xenova/all-MiniLM-L6-v2", { dtype: "q8" });
   }
   return _embedder;
 }

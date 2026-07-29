@@ -337,7 +337,7 @@ Descale every 3 months with the Nimbus descaling solution. The machine carries a
       }
       async function indexUpload(payloadFiles, opts = {}) {
         if (!payloadFiles.length || busy) return;
-        kb.textContent = "Indexing " + payloadFiles.length + " file(s)…";
+        kb.textContent = "Indexing " + payloadFiles.length + " file(s)… (large files can take a bit on the free host)";
         try {
           const r = await fetch("/api/upload", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ files: payloadFiles }) });
           const d = await r.json();

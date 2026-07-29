@@ -101,7 +101,9 @@ const server = createServer(async (req, res) => {
         // instruction hierarchy (lib/rag.ts), which treats context as data.
         for (const label of detectInjection(text).labels) injectionLabels.add(label);
         const source = String(f.name ?? "file").replace(/\.[^.]+$/, "");
-        for (const c of chunkText(source, text)) {
+        // Larger chunks for uploads → far fewer embeds to index (uploads aren't
+        // part of the eval, so this doesn't affect the benchmark corpus).
+        for (const c of chunkText(source, text, 110)) {
           if (pending.length >= MAX_CHUNKS_PER_UPLOAD)
             return json(413, { error: "That document produced too many chunks to index on the free tier. Try a smaller file." });
           pending.push(c);
