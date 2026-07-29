@@ -9,7 +9,7 @@ import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
 import { loadDocuments } from "./ingest";
 import { chunkText } from "./chunk";
-import { embed } from "./embeddings";
+import { embedBatch } from "./embeddings";
 import { InMemoryVectorStore } from "./vectorStore";
 
 const EVAL_CORPUS = resolve(dirname(fileURLToPath(import.meta.url)), "../../eval-corpus");
@@ -17,8 +17,8 @@ const EVAL_CORPUS = resolve(dirname(fileURLToPath(import.meta.url)), "../../eval
 export async function buildEvalKnowledgeBase(): Promise<InMemoryVectorStore> {
   const store = new InMemoryVectorStore();
   const docs = [...loadDocuments(), ...loadDocuments(EVAL_CORPUS)]; // knowledge/ + eval-corpus/
-  for (const chunk of docs.flatMap((d) => chunkText(d.source, d.text))) {
-    store.add(chunk, await embed(chunk.text));
-  }
+  const chunks = docs.flatMap((d) => chunkText(d.source, d.text));
+  const vectors = await embedBatch(chunks.map((c) => c.text));
+  chunks.forEach((c, i) => store.add(c, vectors[i]));
   return store;
 }

@@ -20,8 +20,8 @@ import { dirname, resolve } from "node:path";
 import { randomUUID } from "node:crypto";
 import { buildKnowledgeBase } from "../lib/kb";
 import { answerQuestion, answerChatStream, type ChatTurn } from "../lib/rag";
-import { chunkText } from "../lib/chunk";
-import { embed } from "../lib/embeddings";
+import { chunkText, type Chunk } from "../lib/chunk";
+import { embedBatch } from "../lib/embeddings";
 import { InMemoryVectorStore } from "../lib/vectorStore";
 import { extractText } from "../lib/extract";
 import { detectInjection } from "../lib/guardrails";
@@ -88,7 +88,7 @@ const server = createServer(async (req, res) => {
       const store = new InMemoryVectorStore();
       const names: string[] = [];
       const injectionLabels = new Set<string>();
-      let chunks = 0;
+      const pending: Chunk[] = [];
       let totalChars = 0;
       for (const f of files) {
         const buf = Buffer.from(String(f.base64 ?? ""), "base64");
@@ -102,14 +102,17 @@ const server = createServer(async (req, res) => {
         for (const label of detectInjection(text).labels) injectionLabels.add(label);
         const source = String(f.name ?? "file").replace(/\.[^.]+$/, "");
         for (const c of chunkText(source, text)) {
-          if (chunks >= MAX_CHUNKS_PER_UPLOAD)
+          if (pending.length >= MAX_CHUNKS_PER_UPLOAD)
             return json(413, { error: "That document produced too many chunks to index on the free tier. Try a smaller file." });
-          store.add(c, await embed(c.text));
-          chunks++;
+          pending.push(c);
         }
         names.push(String(f.name));
       }
-      if (store.size() === 0) return json(400, { error: "no text could be extracted from those files" });
+      if (pending.length === 0) return json(400, { error: "no text could be extracted from those files" });
+      // Embed all chunks in batches — far faster than one-at-a-time.
+      const vectors = await embedBatch(pending.map((c) => c.text));
+      pending.forEach((c, i) => store.add(c, vectors[i]));
+      const chunks = pending.length;
 
       const kbId = randomUUID();
       uploads.set(kbId, { store, names });
