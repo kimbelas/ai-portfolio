@@ -69,6 +69,15 @@ export async function retrieveReranked(
 ): Promise<StoredChunk[]> {
   const candidates = await retrieveHybrid(store, query, candidateN);
   if (candidates.length <= k) return candidates.slice(0, k);
-  const ranked = await rerank(query, candidates.map((c) => c.text));
-  return ranked.slice(0, k).map((r) => candidates[r.index]);
+  // Reranking is best-effort: if the cross-encoder can't load (e.g. a flaky
+  // model download on a fresh host), degrade gracefully to the hybrid ranking
+  // rather than failing the whole answer. Locally the model loads, so this path
+  // is never taken and the eval numbers are unaffected.
+  try {
+    const ranked = await rerank(query, candidates.map((c) => c.text));
+    return ranked.slice(0, k).map((r) => candidates[r.index]);
+  } catch (e) {
+    console.error("[retrieve] reranker unavailable — falling back to hybrid:", (e as Error).message);
+    return candidates.slice(0, k);
+  }
 }
