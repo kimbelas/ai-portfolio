@@ -268,12 +268,21 @@ Descale every 3 months with the Nimbus descaling solution. The machine carries a
               if (data.tokens) meta.textContent = data.tokens.total.toLocaleString() + " tokens · ~$" + data.costEstimateUSD + " (frontier rates; $0 on Groq)";
             } else if (event === "error") { throw new Error(data.error || "stream error"); }
           });
-          answer.textContent = acc || "(no answer)";
-          messages.push({ role: "assistant", content: acc });
+          status.style.display = "none"; // always clear the "searching…" state
+          if (acc.trim()) {
+            answer.textContent = acc;
+            messages.push({ role: "assistant", content: acc });
+          } else {
+            // Stream ended with no answer (a transient hiccup, e.g. a cold free
+            // host). Show a clear retry instead of a mute "(no answer)".
+            answer.className = "text err";
+            answer.textContent = "⚠ No answer came back — the service may have hiccuped (the free host can be slow to wake). Please try again.";
+            messages.pop(); // keep history clean so a retry starts fresh
+          }
         } catch (e) {
           status.style.display = "none";
           answer.className = "text err";
-          answer.textContent = "⚠ " + e.message;
+          answer.textContent = "⚠ " + e.message + " — please try again.";
           messages.pop(); // drop the user turn from history so a retry is clean
         } finally {
           busy = false; send.disabled = false; q.focus(); scrollDown();
