@@ -25,6 +25,7 @@ import { embed } from "../lib/embeddings";
 import { InMemoryVectorStore } from "../lib/vectorStore";
 import { extractText } from "../lib/extract";
 import { detectInjection } from "../lib/guardrails";
+import { estimateCostUSD } from "../lib/llm";
 
 const WEB = resolve(dirname(fileURLToPath(import.meta.url)), "../../web");
 const INDEX_HTML = readFileSync(resolve(WEB, "index.html"), "utf8");
@@ -136,8 +137,17 @@ const server = createServer(async (req, res) => {
       } else {
         store = await defaultStore;
       }
-      const { answer, sources } = await answerQuestion(store, question, 4);
-      return json(200, { answer, sources: [...new Set(sources.map((s) => s.source))] });
+      const { answer, sources, usage } = await answerQuestion(store, question, 4);
+      const inTok = usage?.prompt_tokens ?? 0;
+      const outTok = usage?.completion_tokens ?? 0;
+      return json(200, {
+        answer,
+        sources: [...new Set(sources.map((s) => s.source))],
+        // Real token counts ARE the cost meter; the $ is illustrative at frontier
+        // rates — this runs on Groq's free tier, i.e. $0.
+        tokens: { input: inTok, output: outTok, total: inTok + outTok },
+        costEstimateUSD: Number(estimateCostUSD(usage).toFixed(6)),
+      });
     } catch (e) {
       console.error("[/api/ask]", e);
       return json(500, { error: "internal error" });

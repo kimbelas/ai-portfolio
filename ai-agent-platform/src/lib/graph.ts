@@ -14,7 +14,7 @@ import { StateGraph, MessagesAnnotation, START, END, MemorySaver, interrupt } fr
 import { AIMessage, ToolMessage, SystemMessage } from "@langchain/core/messages";
 import { makeModel } from "./model";
 import { TOOLS, TOOLS_BY_NAME, RISKY_TOOLS, ALLOWED_TOOLS } from "./lc-tools";
-import { isToolAllowed, withTimeout } from "./guardrails";
+import { isToolAllowed, withTimeout, validateInput, detectInjection, withRetry } from "./guardrails";
 
 const SYSTEM =
   "You are a careful assistant. Use tools when needed; never guess prices or arithmetic. " +
@@ -23,8 +23,28 @@ const SYSTEM =
 export function createAgent() {
   const model = makeModel().bindTools(TOOLS);
 
+  // Input guardrails (A6), wired into the graph — run BEFORE spending any model
+  // call. On a violation, short-circuit with a refusal (routed straight to END).
+  function firstUserText(messages: any[]): string {
+    const m = messages.find((x) => x?._getType?.() === "human") ?? messages[0];
+    return typeof m?.content === "string" ? m.content : "";
+  }
+  function guardNode(state: typeof MessagesAnnotation.State) {
+    const text = firstUserText(state.messages as any[]);
+    const v = validateInput(text);
+    if (!v.ok) return { messages: [new AIMessage(`I can't process that request: ${v.reason}.`)] };
+    const inj = detectInjection(text);
+    if (!inj.ok) return { messages: [new AIMessage(`Request blocked by a safety guardrail: ${inj.reason}.`)] };
+    return { messages: [] };
+  }
+  function afterGuard(state: typeof MessagesAnnotation.State) {
+    // If the guard produced a refusal (an AI message), stop; else proceed.
+    return state.messages.at(-1)?._getType?.() === "ai" ? END : "agent";
+  }
+
   async function agentNode(state: typeof MessagesAnnotation.State) {
-    const res = await model.invoke([new SystemMessage(SYSTEM), ...state.messages]);
+    // withRetry: survive transient model errors (backoff) instead of crashing the run.
+    const res = await withRetry(() => model.invoke([new SystemMessage(SYSTEM), ...state.messages]));
     return { messages: [res] };
   }
 
@@ -73,9 +93,11 @@ export function createAgent() {
   }
 
   return new StateGraph(MessagesAnnotation)
+    .addNode("guard", guardNode)
     .addNode("agent", agentNode)
     .addNode("tools", toolsNode)
-    .addEdge(START, "agent")
+    .addEdge(START, "guard")
+    .addConditionalEdges("guard", afterGuard, ["agent", END])
     .addConditionalEdges("agent", shouldContinue, ["tools", END])
     .addEdge("tools", "agent")
     .compile({ checkpointer: new MemorySaver() });

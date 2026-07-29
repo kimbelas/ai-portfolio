@@ -25,7 +25,6 @@
     "test": "node --import tsx --test src/lib/guardrails.test.ts src/lib/vectorStore.test.ts src/lib/chunk.test.ts src/lib/retrieve.test.ts src/lib/rag.test.ts src/lib/extract.test.ts src/lib/faithfulness.test.ts src/lib/pgVectorStore.test.ts"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.110.0",
     "@electric-sql/pglite": "0.2.17",
     "@huggingface/transformers": "^4.2.0",
     "dotenv": "^17.4.2",

@@ -23,15 +23,20 @@
 ## Architecture
 
 ```
-   START ──► agent ──(tool_calls?)──► tools ──► agent ──► ... ──► END
-              │  (ChatOpenAI→Groq,      │  custom node:
-              │   .bindTools)           │   • allow-list  (guardrail)
-              │                         │   • interrupt() for risky tools (HITL)
-              │                         │   • timeout     (guardrail)
-              └── MessagesAnnotation state, MemorySaver checkpointer ──┘
+   START ─► guard ─► agent ─(tool_calls?)─► tools ─► agent ─► … ─► END
+             │         │ (ChatOpenAI→Groq,   │ custom node:
+   input validation +  │  wrapped in         │  • allow-list   (guardrail)
+   injection scan;     │  withRetry)         │  • interrupt() for risky tools (HITL)
+   refuse → END        │                     │  • timeout      (guardrail)
+                       └ MessagesAnnotation state, MemorySaver checkpointer ┘
 ```
 
-**Modules:** `lib/model.ts` (ChatOpenAI→Groq) · `lib/tools.ts` (raw fns) · `lib/lc-tools.ts` (LangChain `tool()` defs) · `lib/graph.ts` (the StateGraph: HITL + guardrails + checkpointer) · `lib/guardrails.ts` (validation, injection, timeout, retry).
+The guardrails are **wired into the shipped graph**, not just demoed: the `guard`
+node runs `validateInput` + `detectInjection` before any model call (refuse →
+END), the agent's model call is wrapped in `withRetry`, and the tools node
+enforces the allow-list, a per-tool timeout, and the HITL interrupt.
+
+**Modules:** `lib/model.ts` (ChatOpenAI→Groq) · `lib/tools.ts` (raw fns) · `lib/lc-tools.ts` (LangChain `tool()` defs) · `lib/graph.ts` (the StateGraph: guard + HITL + guardrails + retry + checkpointer) · `lib/guardrails.ts` (validation, injection, timeout, retry).
 
 ## Evaluation
 

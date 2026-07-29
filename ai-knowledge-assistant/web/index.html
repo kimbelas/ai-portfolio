@@ -62,6 +62,7 @@
       .sources .label { color: var(--muted); font-size: 12px; margin-right: 2px; }
       .src { background: var(--panel2); border: 1px solid var(--border); border-radius: 6px; padding: 2px 8px; font-size: 12px; color: var(--accent); }
       .foot { color: var(--muted); font-size: 12px; margin-top: 22px; }
+      .meta { color: var(--muted); font-size: 11px; margin-top: 8px; }
       .dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--accent); animation: p 1s infinite; }
       @keyframes p { 0%,100% { opacity: .3 } 50% { opacity: 1 } }
     </style>
@@ -144,6 +145,14 @@
             s.innerHTML = '<span class="label">sources</span>' +
               data.sources.map((x) => '<span class="src">' + esc(x) + "</span>").join("");
             card.appendChild(s);
+          }
+          if (data.tokens) {
+            const meta = document.createElement("div");
+            meta.className = "meta";
+            meta.textContent = data.tokens.total.toLocaleString() + " tokens (" +
+              data.tokens.input.toLocaleString() + " in / " + data.tokens.output.toLocaleString() +
+              " out) · ~$" + data.costEstimateUSD + " at frontier rates · $0 on Groq";
+            card.appendChild(meta);
           }
         } catch (err) {
           card.querySelector(".a").textContent = "Error: " + err.message;
