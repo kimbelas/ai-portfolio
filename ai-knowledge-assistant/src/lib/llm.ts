@@ -12,12 +12,13 @@ export interface ChatArgs {
   system: string;
   user: string;
   maxTokens?: number;
+  model?: string; // override the default model (e.g. an independent eval judge)
 }
 
 /** One-shot chat completion. Returns the text and token usage. */
-export async function chat({ system, user, maxTokens = 1024 }: ChatArgs) {
+export async function chat({ system, user, maxTokens = 1024, model = MODEL }: ChatArgs) {
   const r = await client.chat.completions.create({
-    model: MODEL,
+    model,
     max_tokens: maxTokens,
     messages: [
       { role: "system", content: system },

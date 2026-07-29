@@ -4,8 +4,10 @@
  * Over a labeled dataset, on a deliberately HARD corpus (near-duplicate and
  * distractor docs), we compare retrieval configs and measure answer quality:
  *   1. Retrieval recall@k — did an acceptable source get retrieved? (deterministic)
- *   2. Answer correctness — does the answer state the gold fact? (LLM-judged),
- *      compared with vs without the cross-encoder reranker.
+ *   2. Answer correctness — does the answer state the gold fact? (LLM-judged;
+ *      the production config is cross-checked by an INDEPENDENT judge model to
+ *      guard against self-preference bias, with judge-agreement reported).
+ *   3. Refusal accuracy — does it decline questions the docs don't cover?
  *
  * Run with:  npm run learn:07   (needs GROQ_API_KEY)
  */
@@ -13,7 +15,7 @@
 import { buildKnowledgeBase } from "../lib/kb";
 import { retrieveSemantic, retrieveHybrid, retrieveReranked } from "../lib/retrieve";
 import { answerQuestion } from "../lib/rag";
-import { chat } from "../lib/llm";
+import { chat, MODEL } from "../lib/llm";
 import type { InMemoryVectorStore } from "../lib/vectorStore";
 
 interface EvalCase {
@@ -62,13 +64,18 @@ const RETRIEVAL_CONFIGS: { name: string; retrieve: Retriever }[] = [
 const hit = (r: { source: string }[], golds: string[], k: number) =>
   r.slice(0, k).some((c) => golds.includes(c.source));
 
-async function judge(question: string, answer: string, goldFact: string): Promise<boolean> {
+async function judge(question: string, answer: string, goldFact: string, model: string): Promise<boolean> {
+  // maxTokens is generous because some judge models (e.g. gpt-oss) are reasoning
+  // models — a tiny budget truncates them before they emit a verdict. We parse
+  // the LAST PASS/FAIL token so any preceding reasoning doesn't fool the grade.
   const { text } = await chat({
-    system: "You are a strict grader. Reply with ONLY the word PASS or FAIL.",
-    user: `Question: ${question}\nExpected fact: ${goldFact}\nAnswer given: ${answer}\n\nDoes the answer correctly convey the expected fact? PASS or FAIL.`,
-    maxTokens: 5,
+    system: "You are a strict grader. Decide whether the answer correctly conveys the expected fact. Reply with your one-word verdict LAST: PASS or FAIL.",
+    user: `Question: ${question}\nExpected fact: ${goldFact}\nAnswer given: ${answer}\n\nDoes the answer correctly convey the expected fact? End with PASS or FAIL.`,
+    maxTokens: 512,
+    model,
   });
-  return /pass/i.test(text);
+  const verdicts = text.toUpperCase().match(/PASS|FAIL/g);
+  return verdicts ? verdicts[verdicts.length - 1] === "PASS" : false;
 }
 
 async function main() {
@@ -91,6 +98,11 @@ async function main() {
   }
 
   // --- 2. Answer correctness (LLM-judged): hybrid vs hybrid+rerank ---
+  // The generator is llama-3.3-70b, so grading with the SAME model risks
+  // self-preference bias. We grade with llama, then cross-check the production
+  // config with an INDEPENDENT judge (a different family) and report agreement.
+  const PRIMARY_JUDGE = MODEL; // llama-3.3-70b — same family as the generator
+  const INDEPENDENT_JUDGE = "openai/gpt-oss-120b"; // different family, blind grader
   const ANSWER_CONFIGS: { name: string; retrieve: any }[] = [
     { name: "hybrid", retrieve: retrieveHybrid },
     { name: "hybrid + rerank", retrieve: retrieveReranked },
@@ -99,13 +111,31 @@ async function main() {
   for (const ac of ANSWER_CONFIGS) {
     let correct = 0;
     const fails: string[] = [];
+    const graded: { q: string; answer: string; gold: string; passA: boolean }[] = [];
     for (const c of DATASET) {
       const { answer } = await answerQuestion(store, c.question, 4, ac.retrieve);
-      if (await judge(c.question, answer, c.goldFact)) correct++;
+      const passA = await judge(c.question, answer, c.goldFact, PRIMARY_JUDGE);
+      if (passA) correct++;
       else fails.push(c.question);
+      graded.push({ q: c.question, answer, gold: c.goldFact, passA });
     }
-    console.log(`answer correctness (${ac.name}): ${Math.round((correct / n) * 100)}% (${correct}/${n})`);
+    console.log(`answer correctness (${ac.name}) [judge llama-3.3-70b]: ${Math.round((correct / n) * 100)}% (${correct}/${n})`);
     if (fails.length) console.log("  failed:" + fails.map((f) => `\n   - ${f}`).join(""));
+
+    // Independent-judge cross-check on the production pipeline (self-bias guard).
+    if (ac.name === "hybrid + rerank") {
+      let correctB = 0, agree = 0;
+      const disagreements: string[] = [];
+      for (const g of graded) {
+        const passB = await judge(g.q, g.answer, g.gold, INDEPENDENT_JUDGE);
+        if (passB) correctB++;
+        if (passB === g.passA) agree++;
+        else disagreements.push(`${g.q} (llama ${g.passA ? "PASS" : "FAIL"} vs gpt-oss ${passB ? "PASS" : "FAIL"})`);
+      }
+      console.log(`answer correctness (${ac.name}) [independent judge gpt-oss-120b]: ${Math.round((correctB / n) * 100)}% (${correctB}/${n})`);
+      console.log(`judge agreement (llama vs gpt-oss-120b): ${Math.round((agree / n) * 100)}% (${agree}/${n})`);
+      if (disagreements.length) console.log("  judges disagreed on:" + disagreements.map((d) => `\n   - ${d}`).join(""));
+    }
   }
 
   // --- 3. Refusal accuracy: does it decline questions the docs don't cover? ---

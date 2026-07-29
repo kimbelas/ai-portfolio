@@ -35,7 +35,7 @@ npm run learn:01                # ... through learn:11, the guided build
 | hybrid (RRF) | 93% | 93% |
 | **hybrid + cross-encoder rerank** | **100%** | **100%** |
 
-Answer correctness (LLM-judged): **93% → 100%** with reranking. The reranker fixed a real retrieval miss — a SAML-SSO question whose source doc ranked outside the top-k, where the grounded pipeline had correctly *refused* rather than hallucinate. See `docs/adr/0004`. *(LLM-as-judge is itself noisy — trust the trend, not any single point.)*
+Answer correctness (LLM-judged): **93% → 100%** with reranking. The reranker fixed a real retrieval miss — a SAML-SSO question whose source doc ranked outside the top-k, where the grounded pipeline had correctly *refused* rather than hallucinate. See `docs/adr/0004`. To guard against self-preference bias, the production config is cross-checked by an **independent judge** (`gpt-oss-120b`, a different model family) which agreed **15/15** with the primary Llama judge. *(LLM-as-judge is still noisy — trust the trend, not any single point.)*
 
 **Refusal accuracy: 100% (5/5).** Over 5 out-of-doc questions — including *"What is the capital of France?"*, which the model knows from pre-training — it declines every one instead of answering, because the fact isn't in the provided documents. That's the whole trust proposition. Full method, failure analysis, and honest caveats: **[docs/blog/measuring-rag-quality.md](docs/blog/measuring-rag-quality.md)**.
 

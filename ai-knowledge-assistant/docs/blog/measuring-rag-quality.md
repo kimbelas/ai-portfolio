@@ -52,8 +52,9 @@ is bad, no amount of prompt engineering saves you.
 **2. Answer correctness** (LLM-as-judge). A second LLM call — the *same*
 Llama-3.3-70B model, in a strict grader role — scores the final answer PASS/FAIL
 against the gold fact. This catches the case where retrieval was fine but the
-model still garbled the answer. (Same-model grading is a known weakness; see the
-caveats.)
+model still garbled the answer. To guard against self-preference bias, the
+production config is **re-graded by an independent judge** — `gpt-oss-120b`, a
+different model family — which agreed with Llama on **15/15**.
 
 **3. Refusal accuracy** (the part most demos skip). Over 5 out-of-doc questions,
 does it correctly decline? The strongest case is
@@ -110,13 +111,13 @@ answer correctness went to 100%. That's [ADR-0004](../adr/0004-cross-encoder-rer
 
 Numbers without caveats are marketing, so:
 
-- **The LLM judge is noisy — and it's the same model grading itself.** The
-  grader is the same Llama-3.3-70B used to generate, in a strict PASS/FAIL role,
-  so it can share the generator's blind spots (self-preference bias). On an
-  earlier run it false-*failed* a correct "payment methods" answer that listed
-  the methods in a different order than the gold fact. I trust the *trend*
-  (hybrid+rerank beats hybrid) more than any single point; an independent judge
-  model and a stricter rubric would tighten this.
+- **The LLM judge is noisy, so I cross-check it.** Llama grading Llama risks
+  self-preference bias, so the production config is re-graded by an **independent
+  judge** (`gpt-oss-120b`, a different family) — the two agreed on **15/15**,
+  which is reassuring, though both run on Groq so it isn't a fully independent
+  stack. The judge is still imperfect (an earlier run false-*failed* a correct
+  "payment methods" answer), so I trust the *trend* over any single point. A
+  human-labeled agreement sample would tighten it further.
 - **The corpus is small** (15 docs, 15+5 questions). These are directional
   results on one domain, not a leaderboard claim. The harness is built to grow —
   more docs and questions is the obvious next step.
