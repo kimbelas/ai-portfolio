@@ -33,26 +33,10 @@ export async function retrieveSemantic(
   return store.search(qVec, k).map((s) => s.chunk);
 }
 
-/**
- * Reciprocal Rank Fusion: merge several rankings of the same items into one.
- * Rewards items that MULTIPLE rankers place near the top, using rank position
- * (not raw scores), so no shared score scale is needed. Pure + deterministic —
- * unit-tested in retrieve.test.ts.
- */
-export function rrfFuse(rankings: StoredChunk[][], k: number, rrfK = 60): StoredChunk[] {
-  const scores = new Map<string, number>();
-  const byId = new Map<string, StoredChunk>();
-  for (const ranking of rankings) {
-    ranking.forEach((chunk, rank) => {
-      scores.set(chunk.id, (scores.get(chunk.id) ?? 0) + 1 / (rrfK + rank));
-      byId.set(chunk.id, chunk);
-    });
-  }
-  return [...scores.entries()]
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, k)
-    .map(([id]) => byId.get(id)!);
-}
+// rrfFuse lives in a dependency-free module (fusion.ts) so unit tests can import
+// it without loading the embedding/reranker runtime. Re-exported for callers.
+import { rrfFuse } from "./fusion";
+export { rrfFuse };
 
 /**
  * Hybrid retrieval: fuse the semantic ranking and the keyword ranking using

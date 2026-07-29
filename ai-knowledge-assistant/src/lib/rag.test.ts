@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { SYSTEM, buildContext } from "./rag";
+import { SYSTEM, buildContext } from "./grounding";
 import type { StoredChunk } from "./vectorStore";
 
 const chunk = (id: string, source: string, text: string): StoredChunk =>

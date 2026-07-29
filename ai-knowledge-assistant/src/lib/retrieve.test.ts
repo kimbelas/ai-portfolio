@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { rrfFuse } from "./retrieve";
+import { rrfFuse } from "./fusion";
 import type { StoredChunk } from "./vectorStore";
 
 const c = (id: string): StoredChunk => ({ id, source: id, text: id } as StoredChunk);
