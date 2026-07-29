@@ -1,8 +1,10 @@
 /**
  * RUNG 7 — Evals (measure it — the senior differentiator).
  *
- * Over a labeled dataset, on a deliberately HARD corpus (near-duplicate and
- * distractor docs), we compare retrieval configs and measure answer quality:
+ * Over a labeled dataset spanning TWO domains (a cloud SaaS + an e-bike maker,
+ * so retrieval must generalize and not confuse one domain's docs for another's),
+ * on a deliberately HARD corpus (near-duplicate + distractor docs), we compare
+ * retrieval configs and measure answer quality:
  *   1. Retrieval recall@k — did an acceptable source get retrieved? (deterministic)
  *   2. Answer correctness — does the answer state the gold fact? (LLM-judged;
  *      the production config is cross-checked by an INDEPENDENT judge model to
@@ -12,7 +14,7 @@
  * Run with:  npm run learn:07   (needs GROQ_API_KEY)
  */
 
-import { buildKnowledgeBase } from "../lib/kb";
+import { buildEvalKnowledgeBase } from "../lib/eval-kb";
 import { retrieveSemantic, retrieveHybrid, retrieveReranked } from "../lib/retrieve";
 import { answerQuestion } from "../lib/rag";
 import { chat, MODEL } from "../lib/llm";
@@ -45,7 +47,7 @@ async function judge(question: string, answer: string, goldFact: string, model: 
 }
 
 async function main() {
-  const store = await buildKnowledgeBase();
+  const store = await buildEvalKnowledgeBase();
   const n = DATASET.length;
   console.log(`Corpus: ${store.size()} chunks · Eval: ${n} questions\n`);
 
@@ -61,6 +63,18 @@ async function main() {
     }
     const pct = (x: number) => `${Math.round((x / n) * 100)}%`;
     console.log(`${cfg.name.padEnd(17)}  ${pct(r1).padStart(7)}   ${pct(r3).padStart(7)}`);
+  }
+
+  // Per-domain recall@1 for the production retriever (does it generalize across
+  // domains and not confuse one domain's docs for another's?).
+  const domains = [...new Set(DATASET.map((c) => c.domain))];
+  for (const d of domains) {
+    const cases = DATASET.filter((c) => c.domain === d);
+    let r1 = 0;
+    for (const c of cases) {
+      if (hit(await retrieveReranked(store, c.question, 3), c.goldSources, 1)) r1++;
+    }
+    console.log(`  recall@1 [hybrid+rerank] · ${d.padEnd(6)}: ${Math.round((r1 / cases.length) * 100)}% (${r1}/${cases.length})`);
   }
 
   // --- 2. Answer correctness (LLM-judged): hybrid vs hybrid+rerank ---

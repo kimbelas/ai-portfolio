@@ -107,6 +107,25 @@ then `Xenova/ms-marco-MiniLM-L-6-v2` re-scores each *(question, chunk)* pair
 can't do. The `enterprise` chunk jumped to the top, and both recall@1 and
 answer correctness went to 100%. That's [ADR-0004](../adr/0004-cross-encoder-reranker.md).
 
+## Scaling the eval: a second domain
+
+The first version measured 15 questions on one synthetic domain — too small to
+trust, and a monoculture. So I added a **second, deliberately different domain**
+(an e-bike maker, disjoint vocabulary from the SaaS), kept in a separate
+`eval-corpus/` so the shipped demo stays on-topic, taking the eval to **51
+chunks / 30 labelled questions across two domains**.
+
+The picture got more honest. Retrieval recall@1 is now **97% for all three
+retrievers** — the reranker's 93% → 100% recall@1 lift from the single-domain
+set **did not replicate**; on the larger set its benefit shows at recall@3
+(→100%). Per domain: Acme 100% recall@1, Cobalt 93%.
+
+That's the whole reason to scale an eval: a clean headline on 15 questions turned
+out to be partly specific to one case (the SAML miss). The measurement got less
+flattering and more true — which is the point. *(Both domains are authored, not
+scraped, so still directional; the LLM-judged metrics over the two-domain set are
+pending a token-budget refresh.)*
+
 ## Honest caveats
 
 Numbers without caveats are marketing, so:

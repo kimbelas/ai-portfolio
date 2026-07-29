@@ -11,7 +11,7 @@
  * Run with:  npm run eval:ci     (no API key needed)
  */
 
-import { buildKnowledgeBase } from "./lib/kb";
+import { buildEvalKnowledgeBase } from "./lib/eval-kb";
 import { retrieveReranked } from "./lib/retrieve";
 import { DATASET } from "./lib/eval-dataset";
 import type { InMemoryVectorStore } from "./lib/vectorStore";
@@ -36,9 +36,9 @@ async function build(): Promise<InMemoryVectorStore> {
   // One retry: the first run downloads the embedding/reranker models, so tolerate
   // a transient network hiccup before failing the build.
   try {
-    return await buildKnowledgeBase();
+    return await buildEvalKnowledgeBase();
   } catch {
-    return await buildKnowledgeBase();
+    return await buildEvalKnowledgeBase();
   }
 }
 

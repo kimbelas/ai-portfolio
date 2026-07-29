@@ -28,13 +28,17 @@ npm run learn:01                # ... through learn:11, the guided build
 
 ## Benchmark
 
-`npm run eval` over a 37-chunk corpus (15 labelled questions with near-duplicate/distractor docs), comparing retrieval strategies:
+`npm run eval` over a **two-domain** corpus — a cloud-storage SaaS (Acme) + an e-bike maker (Cobalt), **51 chunks**, both authored — with **30 labelled questions** (near-duplicate/distractor docs). Retrieval recall (deterministic):
 
 | retrieval | recall@1 | recall@3 |
 |---|---|---|
-| semantic | 93% | 93% |
-| hybrid (RRF) | 93% | 93% |
-| **hybrid + cross-encoder rerank** | **100%** | **100%** |
+| semantic | 97% | 97% |
+| hybrid (RRF) | 97% | 97% |
+| **hybrid + cross-encoder rerank** | 97% | **100%** |
+
+Per-domain recall@1 (hybrid+rerank): **Acme 100%** (15/15), **Cobalt 93%** (14/15). **Honest scaling result:** the reranker's recall@1 lift on the original single-domain 15-question set (93% → 100%, fixing a SAML miss — ADR-0004) did *not* replicate at this larger scale — all three retrievers tie at 97% recall@1, and the reranker's benefit now shows at recall@3 (→100%). That's exactly why you scale evals: the earlier number was real but case-specific.
+
+> **Scope:** answer-correctness, refusal, injection-resistance, and faithfulness (below) were measured on the original single-domain set; re-running those LLM-judged metrics over the two-domain corpus is pending a free-tier daily-token refresh. Retrieval recall (above) is already on the two-domain corpus.
 
 Answer correctness (LLM-judged): **93% → 100%** with reranking. The reranker fixed a real retrieval miss — a SAML-SSO question whose source doc ranked outside the top-k, where the grounded pipeline had correctly *refused* rather than hallucinate. See `docs/adr/0004`. To guard against self-preference bias, the production config is cross-checked by an **independent judge** (`gpt-oss-120b`, a different model family) which agreed **15/15** with the primary Llama judge. *(LLM-as-judge is still noisy — trust the trend, not any single point.)*
 

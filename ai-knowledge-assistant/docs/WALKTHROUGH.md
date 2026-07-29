@@ -78,8 +78,10 @@ The eval harness is the point — five metrics, each catching a different failur
 The value isn't any single number — it's the *instrument*. Change a dial (chunk
 size, k, model, prompt, semantic↔hybrid↔rerank) and rerun to watch the number
 move. That measure→change→measure loop is the core of AI engineering. *(Honest
-limits: small single-domain eval sets, single runs, and the LLM judge is the
-same model grading itself — the writeup says so plainly.)*
+limits: still-small eval sets and single runs. The LLM judge is now cross-checked
+by an independent model family, and retrieval recall spans **two domains** — see
+the [blog](blog/measuring-rag-quality.md) for the scaling result, where the
+reranker's recall@1 lift turned out to be partly case-specific.)*
 
 ## Try it
 
