@@ -28,12 +28,17 @@ export async function chat({ system, user, maxTokens = 1024, model = MODEL }: Ch
   return { text: r.choices[0].message.content ?? "", usage: r.usage };
 }
 
-/** Streaming chat completion. Yields text deltas as they generate. */
-export async function* streamChat({ system, user, maxTokens = 1024 }: ChatArgs) {
+/** Streaming chat completion. Yields text deltas; calls onUsage with the final
+ *  token usage (Groq returns it in the last chunk when include_usage is set). */
+export async function* streamChat(
+  { system, user, maxTokens = 1024, model = MODEL }: ChatArgs,
+  onUsage?: (usage: any) => void,
+) {
   const stream = await client.chat.completions.create({
-    model: MODEL,
+    model,
     max_tokens: maxTokens,
     stream: true,
+    stream_options: { include_usage: true },
     messages: [
       { role: "system", content: system },
       { role: "user", content: user },
@@ -42,6 +47,8 @@ export async function* streamChat({ system, user, maxTokens = 1024 }: ChatArgs) 
   for await (const part of stream) {
     const delta = part.choices[0]?.delta?.content;
     if (delta) yield delta;
+    const usage = (part as any).usage;
+    if (usage && onUsage) onUsage(usage);
   }
 }
 

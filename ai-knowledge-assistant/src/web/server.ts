@@ -19,7 +19,7 @@ import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
 import { randomUUID } from "node:crypto";
 import { buildKnowledgeBase } from "../lib/kb";
-import { answerQuestion } from "../lib/rag";
+import { answerQuestion, answerChatStream, type ChatTurn } from "../lib/rag";
 import { chunkText } from "../lib/chunk";
 import { embed } from "../lib/embeddings";
 import { InMemoryVectorStore } from "../lib/vectorStore";
@@ -151,6 +151,61 @@ const server = createServer(async (req, res) => {
     } catch (e) {
       console.error("[/api/ask]", e);
       return json(500, { error: "internal error" });
+    }
+  }
+
+  // Streaming, multi-turn chat (SSE). Body: { messages: ChatTurn[], kbId? }.
+  // Emits events: status → sources → token* → done (or error).
+  if (req.method === "POST" && req.url === "/api/chat") {
+    let store: InMemoryVectorStore;
+    try {
+      const { messages, kbId } = JSON.parse(await readBody(req, 1024 * 1024));
+      if (!Array.isArray(messages) || messages.length === 0) return json(400, { error: "messages required" });
+      const latest = messages[messages.length - 1];
+      if (!latest || latest.role !== "user" || typeof latest.content !== "string" || !latest.content.trim())
+        return json(400, { error: "the last message must be a non-empty user turn" });
+
+      if (kbId) {
+        const entry = uploads.get(kbId);
+        if (!entry) return json(410, { error: "Your uploaded documents expired (the server may have restarted). Please upload the file again." });
+        store = entry.store;
+      } else {
+        store = await defaultStore;
+      }
+
+      res.writeHead(200, {
+        "content-type": "text/event-stream",
+        "cache-control": "no-cache",
+        connection: "keep-alive",
+        "x-accel-buffering": "no", // don't let a proxy buffer the stream
+      });
+      const send = (event: string, data: unknown) => res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
+      const names = (chunks: { source: string }[]) => [...new Set(chunks.map((c) => c.source))];
+
+      try {
+        for await (const ev of answerChatStream(store, messages as ChatTurn[])) {
+          if (ev.type === "status") send("status", { stage: ev.stage });
+          else if (ev.type === "sources")
+            send("sources", { sources: names(ev.sources), passages: ev.sources.map((s) => ({ source: s.source, text: s.text })) });
+          else if (ev.type === "token") send("token", { text: ev.text });
+          else if (ev.type === "done") {
+            const inTok = ev.usage?.prompt_tokens ?? 0;
+            const outTok = ev.usage?.completion_tokens ?? 0;
+            send("done", {
+              sources: names(ev.sources),
+              tokens: { input: inTok, output: outTok, total: inTok + outTok },
+              costEstimateUSD: Number(estimateCostUSD(ev.usage).toFixed(6)),
+            });
+          }
+        }
+      } catch (streamErr) {
+        send("error", { error: (streamErr as Error).message });
+      }
+      return res.end();
+    } catch (e) {
+      console.error("[/api/chat]", e);
+      if (!res.headersSent) return json(500, { error: "internal error" });
+      return res.end();
     }
   }
 

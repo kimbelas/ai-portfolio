@@ -3,214 +3,312 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Acme Knowledge Assistant · RAG demo</title>
+    <title>Acme Knowledge · grounded, cited RAG</title>
     <style>
       :root {
-        --bg: #0b0d12; --panel: #151922; --panel2: #1c2230; --text: #e8ecf4;
-        --muted: #9aa6bd; --accent: #5b9dff; --border: #262e3d; --chip: #232b3b;
+        --bg: #faf9f7; --surface: #fff; --text: #16181d; --muted: #6c6f78; --faint: #9a9ca4;
+        --rule: #e7e4de; --accent: #2f54ff; --accent-weak: rgba(47, 84, 255, .09); --warn: #b7791f;
+        --maxw: 760px;
       }
-      @media (prefers-color-scheme: light) {
-        :root {
-          --bg: #f6f8fc; --panel: #ffffff; --panel2: #f0f3fa; --text: #101423;
-          --muted: #5b6a86; --accent: #2563eb; --border: #e2e8f2; --chip: #eef2fb;
-        }
+      @media (prefers-color-scheme: dark) {
+        :root { --bg: #0c0d11; --surface: #14161c; --text: #e9eaee; --muted: #9aa0ad; --faint: #676c78;
+          --rule: #212530; --accent: #6d84ff; --accent-weak: rgba(109, 132, 255, .14); --warn: #d8a24a; }
       }
+      :root[data-theme="light"] { --bg: #faf9f7; --surface: #fff; --text: #16181d; --muted: #6c6f78; --faint: #9a9ca4;
+        --rule: #e7e4de; --accent: #2f54ff; --accent-weak: rgba(47, 84, 255, .09); --warn: #b7791f; }
+      :root[data-theme="dark"] { --bg: #0c0d11; --surface: #14161c; --text: #e9eaee; --muted: #9aa0ad; --faint: #676c78;
+        --rule: #212530; --accent: #6d84ff; --accent-weak: rgba(109, 132, 255, .14); --warn: #d8a24a; }
+
       * { box-sizing: border-box; }
-      body {
-        margin: 0; background: var(--bg); color: var(--text);
-        font: 15px/1.55 -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
-        display: flex; justify-content: center;
-      }
-      .wrap { width: 100%; max-width: 720px; padding: 32px 20px 64px; }
-      header h1 { font-size: 20px; margin: 0 0 4px; }
-      header p { color: var(--muted); margin: 0 0 18px; }
+      html, body { height: 100%; }
+      body { margin: 0; background: var(--bg); color: var(--text);
+        font: 16px/1.65 system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility; }
+      .app { max-width: var(--maxw); margin: 0 auto; height: 100dvh; display: flex; flex-direction: column; padding: 0 20px; }
       a { color: var(--accent); }
-      .kbbar {
-        background: var(--panel2); border: 1px solid var(--border); border-radius: 10px;
-        padding: 10px 12px; font-size: 13px; color: var(--muted); margin-bottom: 12px;
-      }
-      .kbbar strong { color: var(--text); }
-      .kbbar .reset { margin-left: 8px; cursor: pointer; color: var(--accent); }
-      .drop {
-        border: 1.5px dashed var(--border); border-radius: 12px; padding: 16px;
-        text-align: center; color: var(--muted); font-size: 13px; margin-bottom: 16px;
-        transition: border-color .15s, background .15s;
-      }
-      .drop.drag { border-color: var(--accent); background: var(--panel2); }
-      .examples { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
-      .chip {
-        background: var(--chip); color: var(--text); border: 1px solid var(--border);
-        border-radius: 999px; padding: 6px 12px; font-size: 13px; cursor: pointer;
-      }
-      .chip:hover { border-color: var(--accent); }
-      form { display: flex; gap: 8px; }
-      input[type=text] {
-        flex: 1; background: var(--panel); color: var(--text); border: 1px solid var(--border);
-        border-radius: 10px; padding: 12px 14px; font-size: 15px; outline: none;
-      }
-      input[type=text]:focus { border-color: var(--accent); }
-      button {
-        background: var(--accent); color: #fff; border: 0; border-radius: 10px;
-        padding: 0 18px; font-size: 15px; font-weight: 600; cursor: pointer;
-      }
-      button:disabled { opacity: .55; cursor: default; }
-      #out { margin-top: 22px; display: flex; flex-direction: column; gap: 14px; }
-      .card { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 16px 18px; }
-      .q { color: var(--muted); font-size: 13px; margin-bottom: 6px; }
-      .a { white-space: pre-wrap; }
-      .sources { margin-top: 12px; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
-      .sources .label { color: var(--muted); font-size: 12px; margin-right: 2px; }
-      .src { background: var(--panel2); border: 1px solid var(--border); border-radius: 6px; padding: 2px 8px; font-size: 12px; color: var(--accent); }
-      .foot { color: var(--muted); font-size: 12px; margin-top: 22px; }
-      .meta { color: var(--muted); font-size: 11px; margin-top: 8px; }
-      .dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--accent); animation: p 1s infinite; }
-      @keyframes p { 0%,100% { opacity: .3 } 50% { opacity: 1 } }
+
+      header.top { display: flex; align-items: center; justify-content: space-between; padding: 18px 0 14px; border-bottom: 1px solid var(--rule); }
+      .brand { font-size: 14px; font-weight: 650; letter-spacing: -.01em; }
+      .brand small { color: var(--faint); font-weight: 500; margin-left: 6px; }
+      .top-actions { display: flex; gap: 16px; align-items: center; font-size: 13px; }
+      .top-actions a, .iconbtn { color: var(--muted); text-decoration: none; cursor: pointer; background: none; border: 0; font: inherit; padding: 0; }
+      .top-actions a:hover, .iconbtn:hover { color: var(--text); }
+
+      .thread { flex: 1; overflow-y: auto; padding: 6px 0 16px; scroll-behavior: smooth; }
+
+      /* empty state */
+      .empty { padding: 11vh 0 0; }
+      .empty h1 { font-size: clamp(28px, 6vw, 38px); line-height: 1.08; letter-spacing: -.025em; font-weight: 720; margin: 0 0 12px; }
+      .empty p { color: var(--muted); margin: 0 0 26px; max-width: 52ch; }
+      .suggest button { width: 100%; text-align: left; background: none; border: 0; border-top: 1px solid var(--rule);
+        padding: 14px 2px; color: var(--text); font: inherit; font-size: 15.5px; cursor: pointer; display: flex; justify-content: space-between; gap: 12px; }
+      .suggest button:last-child { border-bottom: 1px solid var(--rule); }
+      .suggest button:hover { color: var(--accent); }
+      .suggest .arr { color: var(--faint); }
+      .suggest button:hover .arr { color: var(--accent); }
+
+      /* turns */
+      .turn { padding: 20px 0; border-top: 1px solid var(--rule); }
+      .turn:first-child { border-top: 0; }
+      .label { font-size: 11px; text-transform: uppercase; letter-spacing: .12em; color: var(--faint); margin-bottom: 9px; font-weight: 600; }
+      .turn.user .text { font-size: 18px; font-weight: 560; letter-spacing: -.011em; }
+      .turn.assistant .text { white-space: pre-wrap; word-wrap: break-word; }
+      .caret { display: inline-block; width: 7px; height: 1.05em; background: var(--accent); vertical-align: text-bottom; margin-left: 2px; animation: blink 1.05s step-end infinite; }
+      @keyframes blink { 50% { opacity: 0; } }
+      .status { color: var(--muted); font-size: 14px; display: flex; gap: 9px; align-items: center; }
+      .status .d { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); animation: pulse 1.1s infinite; }
+      @keyframes pulse { 0%,100% { opacity: .25; } 50% { opacity: 1; } }
+      .srcline { font-size: 13px; color: var(--muted); display: flex; flex-wrap: wrap; gap: 10px 14px; align-items: center; margin-bottom: 12px; }
+      .src { color: var(--accent); }
+      .src::before { content: "▸\00a0"; color: var(--faint); }
+      .toggle-src { background: none; border: 0; color: var(--faint); font: inherit; font-size: 13px; cursor: pointer; text-decoration: underline; text-underline-offset: 2px; }
+      .toggle-src:hover { color: var(--text); }
+      .passages { display: none; border-left: 2px solid var(--rule); padding: 2px 0 2px 14px; margin: -4px 0 14px; }
+      .passages.open { display: block; }
+      .passages .p { font-size: 13.5px; line-height: 1.55; color: var(--muted); margin: 9px 0; white-space: pre-wrap; }
+      .passages .p b { color: var(--text); font-weight: 600; }
+      .meta { color: var(--faint); font-size: 12px; margin-top: 12px; }
+      .err { color: var(--warn); }
+
+      /* composer */
+      .composer-wrap { border-top: 1px solid var(--rule); padding: 14px 0 12px; background: var(--bg); }
+      .composer { display: flex; align-items: flex-end; gap: 10px; background: var(--surface); border: 1px solid var(--rule); border-radius: 14px; padding: 8px 8px 8px 16px; transition: border-color .15s, box-shadow .15s; }
+      .composer:focus-within { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-weak); }
+      body.dragging .composer { border-color: var(--accent); border-style: dashed; }
+      .composer textarea { flex: 1; border: 0; background: none; color: var(--text); font: inherit; resize: none; outline: none; max-height: 168px; line-height: 1.5; padding: 8px 0; }
+      .composer textarea::placeholder { color: var(--faint); }
+      .send { flex: 0 0 auto; width: 38px; height: 38px; border-radius: 11px; background: var(--accent); color: #fff; border: 0; cursor: pointer; font-size: 18px; line-height: 1; display: grid; place-items: center; }
+      .send:disabled { opacity: .4; cursor: default; }
+      .subrow { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 9px; font-size: 12.5px; color: var(--muted); flex-wrap: wrap; }
+      .kb b { color: var(--text); font-weight: 600; }
+      .link { color: var(--accent); cursor: pointer; background: none; border: 0; font: inherit; font-size: inherit; padding: 0; }
+      .link:hover { text-decoration: underline; }
+      .warn { color: var(--warn); }
+      .foot { color: var(--faint); }
     </style>
   </head>
   <body>
-    <div class="wrap">
-      <header>
-        <h1>Acme Knowledge Assistant</h1>
-        <p>Grounded, cited answers over a document set (hybrid retrieval + reranking). It only answers from the provided docs, and says &ldquo;I don&rsquo;t know&rdquo; when they don&rsquo;t cover it.</p>
+    <div class="app">
+      <header class="top">
+        <div class="brand">Acme Knowledge<small>grounded &amp; cited</small></div>
+        <div class="top-actions">
+          <button class="iconbtn" id="newchat" title="New chat">New chat</button>
+          <a href="/manual">How it works</a>
+          <button class="iconbtn" id="theme" title="Toggle theme">◐</button>
+        </div>
       </header>
 
-      <div class="kbbar" id="kbbar">Answering from the built-in <strong>Acme</strong> docs.</div>
+      <div class="thread" id="thread">
+        <div class="empty" id="empty">
+          <h1>Ask about Acme — answers only from the docs.</h1>
+          <p>Retrieval-augmented, cited, and honest: it answers strictly from the source documents and says <em>“I don’t know”</em> when they don’t cover something. Bring your own PDF/Markdown/Word file to query instead.</p>
+          <div class="suggest" id="suggest"></div>
+        </div>
+      </div>
 
-      <div class="drop" id="drop">
+      <div class="composer-wrap">
         <input id="file" type="file" multiple accept=".pdf,.md,.markdown,.txt,.docx" hidden />
-        Drag files here, or <a id="browse" href="#">choose files</a> — <strong>PDF, Markdown, or Word (.docx)</strong>.
-        Your files become the <em>only</em> source the assistant answers from.
+        <form class="composer" id="form">
+          <textarea id="q" rows="1" placeholder="Ask a question…" autocomplete="off"></textarea>
+          <button class="send" id="send" type="submit" title="Send" aria-label="Send">↑</button>
+        </form>
+        <div class="subrow">
+          <span class="kb" id="kb">Answering from the built-in <b>Acme</b> docs.</span>
+          <span><button class="link" id="adddocs">＋ your documents</button> · <span class="foot">RAG · Groq · on-device embeddings</span></span>
+        </div>
       </div>
-
-      <div class="examples" id="examples">
-        <span class="chip">Is Acme HIPAA compliant?</span>
-        <span class="chip">Does Acme support SAML single sign-on?</span>
-        <span class="chip">What is the API rate limit?</span>
-        <span class="chip">Who is the CEO?</span>
-      </div>
-
-      <form id="form">
-        <input id="q" type="text" autocomplete="off" placeholder="Ask a question…" />
-        <button id="send" type="submit">Ask</button>
-      </form>
-
-      <div id="out"></div>
-      <div class="foot">RAG over local docs · Groq + on-device embeddings/reranker · grounded &amp; cited. <a href="/manual">How it works →</a></div>
     </div>
 
     <script>
-      const form = document.getElementById("form");
-      const input = document.getElementById("q");
-      const send = document.getElementById("send");
-      const out = document.getElementById("out");
-      const drop = document.getElementById("drop");
-      const fileInput = document.getElementById("file");
-      const kbbar = document.getElementById("kbbar");
-      const examples = document.getElementById("examples");
-
-      let activeKb = null; // null = built-in Acme docs
+      const $ = (id) => document.getElementById(id);
+      const thread = $("thread"), empty = $("empty"), form = $("form"), q = $("q"), send = $("send");
+      const kb = $("kb"), fileInput = $("file");
       const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 
-      // ---- ask ----
-      examples.addEventListener("click", (e) => {
-        if (e.target.classList.contains("chip")) { input.value = e.target.textContent; ask(); }
+      let messages = [];      // running conversation: {role, content}
+      let activeKb = null;    // null = built-in Acme docs
+      let busy = false;
+
+      const SUGGESTIONS = [
+        "Is Acme HIPAA compliant?",
+        "What is the API rate limit, and what happens if I exceed it?",
+        "Does Acme support SAML single sign-on?",
+        "Who is the CEO?",
+      ];
+
+      // ---------- theme ----------
+      const savedTheme = localStorage.getItem("theme");
+      if (savedTheme) document.documentElement.dataset.theme = savedTheme;
+      $("theme").addEventListener("click", () => {
+        const cur = document.documentElement.dataset.theme
+          || (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+        const next = cur === "dark" ? "light" : "dark";
+        document.documentElement.dataset.theme = next; localStorage.setItem("theme", next);
       });
-      form.addEventListener("submit", (e) => { e.preventDefault(); ask(); });
 
-      async function ask() {
-        const question = input.value.trim();
-        if (!question) return;
-        input.value = "";
-        send.disabled = true;
+      // ---------- empty state ----------
+      function renderEmpty() {
+        const s = $("suggest"); s.innerHTML = "";
+        SUGGESTIONS.forEach((text) => {
+          const b = document.createElement("button");
+          b.innerHTML = '<span>' + esc(text) + '</span><span class="arr">→</span>';
+          b.addEventListener("click", () => ask(text));
+          s.appendChild(b);
+        });
+        empty.style.display = "";
+      }
+      renderEmpty();
 
-        const card = document.createElement("div");
-        card.className = "card";
-        card.innerHTML = '<div class="q"></div><div class="a"><span class="dot"></span> thinking…</div>';
-        card.querySelector(".q").textContent = question;
-        out.prepend(card);
+      // ---------- rendering ----------
+      function nearBottom() { return thread.scrollHeight - thread.scrollTop - thread.clientHeight < 120; }
+      function scrollDown() { thread.scrollTop = thread.scrollHeight; }
+
+      function addTurn(role) {
+        empty.style.display = "none";
+        const el = document.createElement("div");
+        el.className = "turn " + role;
+        el.innerHTML = '<div class="label">' + (role === "user" ? "You" : "Acme") + '</div>';
+        thread.appendChild(el);
+        return el;
+      }
+      function userTurn(text) {
+        const el = addTurn("user");
+        const t = document.createElement("div"); t.className = "text"; t.textContent = text;
+        el.appendChild(t); scrollDown();
+      }
+
+      async function ask(text) {
+        text = (text || "").trim();
+        if (!text || busy) return;
+        busy = true; send.disabled = true; q.value = ""; autosize();
+        messages.push({ role: "user", content: text });
+        userTurn(text);
+
+        const el = addTurn("assistant");
+        const status = document.createElement("div"); status.className = "status";
+        status.innerHTML = '<span class="d"></span> Searching the documents…';
+        const srcline = document.createElement("div"); srcline.className = "srcline"; srcline.style.display = "none";
+        const passages = document.createElement("div"); passages.className = "passages";
+        const answer = document.createElement("div"); answer.className = "text";
+        const meta = document.createElement("div"); meta.className = "meta";
+        el.append(status, srcline, passages, answer, meta);
+        scrollDown();
+
+        let acc = "", finalSources = [];
+        const caret = () => { answer.innerHTML = esc(acc) + '<span class="caret"></span>'; };
+
+        function showSources(names, passageList) {
+          status.style.display = "none";
+          srcline.style.display = "";
+          const chips = (names || []).map((n) => '<span class="src">' + esc(n) + "</span>").join("");
+          const hasP = passageList && passageList.length;
+          srcline.innerHTML = chips + (hasP ? ' <button class="toggle-src">view passages</button>' : "");
+          if (hasP) {
+            passages.innerHTML = passageList.map((p) => '<div class="p"><b>' + esc(p.source) + "</b> — " + esc(p.text) + "</div>").join("");
+            srcline.querySelector(".toggle-src").addEventListener("click", (e) => {
+              passages.classList.toggle("open");
+              e.target.textContent = passages.classList.contains("open") ? "hide passages" : "view passages";
+            });
+          }
+        }
 
         try {
-          const r = await fetch("/api/ask", {
-            method: "POST",
-            headers: { "content-type": "application/json" },
-            body: JSON.stringify({ question, kbId: activeKb }),
+          await stream({ messages, kbId: activeKb }, (event, data) => {
+            if (event === "status") { status.style.display = ""; }
+            else if (event === "sources") { finalSources = data.sources || []; showSources(data.sources, data.passages); }
+            else if (event === "token") { acc += data.text || ""; caret(); if (nearBottom()) scrollDown(); }
+            else if (event === "done") {
+              answer.textContent = acc;
+              if (data.sources) showSources(data.sources, null);
+              if (data.tokens) meta.textContent = data.tokens.total.toLocaleString() + " tokens · ~$" + data.costEstimateUSD + " (frontier rates; $0 on Groq)";
+            } else if (event === "error") { throw new Error(data.error || "stream error"); }
           });
-          const data = await r.json();
-          if (r.status === 410) { resetKb(); throw new Error(data.error || "upload expired — please upload the file again"); }
-          if (data.error) throw new Error(data.error);
-          card.querySelector(".a").textContent = data.answer;
-          if (data.sources && data.sources.length) {
-            const s = document.createElement("div");
-            s.className = "sources";
-            s.innerHTML = '<span class="label">sources</span>' +
-              data.sources.map((x) => '<span class="src">' + esc(x) + "</span>").join("");
-            card.appendChild(s);
-          }
-          if (data.tokens) {
-            const meta = document.createElement("div");
-            meta.className = "meta";
-            meta.textContent = data.tokens.total.toLocaleString() + " tokens (" +
-              data.tokens.input.toLocaleString() + " in / " + data.tokens.output.toLocaleString() +
-              " out) · ~$" + data.costEstimateUSD + " at frontier rates · $0 on Groq";
-            card.appendChild(meta);
-          }
-        } catch (err) {
-          card.querySelector(".a").textContent = "Error: " + err.message;
+          answer.textContent = acc || "(no answer)";
+          messages.push({ role: "assistant", content: acc });
+        } catch (e) {
+          status.style.display = "none";
+          answer.className = "text err";
+          answer.textContent = "⚠ " + e.message;
+          messages.pop(); // drop the user turn from history so a retry is clean
         } finally {
-          send.disabled = false;
-          input.focus();
+          busy = false; send.disabled = false; q.focus(); scrollDown();
         }
       }
 
-      // ---- upload ----
-      document.getElementById("browse").addEventListener("click", (e) => { e.preventDefault(); fileInput.click(); });
-      fileInput.addEventListener("change", () => upload([...fileInput.files]));
-      ["dragenter", "dragover"].forEach((ev) => drop.addEventListener(ev, (e) => { e.preventDefault(); drop.classList.add("drag"); }));
-      ["dragleave", "drop"].forEach((ev) => drop.addEventListener(ev, (e) => { e.preventDefault(); drop.classList.remove("drag"); }));
-      drop.addEventListener("drop", (e) => upload([...e.dataTransfer.files]));
-
-      function toBase64(file) {
-        return new Promise((res, rej) => {
-          const r = new FileReader();
-          r.onload = () => res(String(r.result).split(",")[1]);
-          r.onerror = rej;
-          r.readAsDataURL(file);
-        });
+      // ---------- SSE over fetch ----------
+      async function stream(payload, on) {
+        const r = await fetch("/api/chat", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(payload) });
+        if (!r.ok || (r.headers.get("content-type") || "").includes("application/json")) {
+          const d = await r.json().catch(() => ({}));
+          if (r.status === 410) { resetKb(); }
+          throw new Error(d.error || ("HTTP " + r.status));
+        }
+        const reader = r.body.getReader(); const dec = new TextDecoder(); let buf = "";
+        while (true) {
+          const { value, done } = await reader.read(); if (done) break;
+          buf += dec.decode(value, { stream: true });
+          let i;
+          while ((i = buf.indexOf("\n\n")) >= 0) {
+            const frame = buf.slice(0, i); buf = buf.slice(i + 2);
+            let event = "message", data = "";
+            for (const line of frame.split("\n")) {
+              if (line.startsWith("event:")) event = line.slice(6).trim();
+              else if (line.startsWith("data:")) data += line.slice(5).trim();
+            }
+            if (data) { let parsed = {}; try { parsed = JSON.parse(data); } catch {} on(event, parsed); }
+          }
+        }
       }
 
+      // ---------- composer ----------
+      function autosize() { q.style.height = "auto"; q.style.height = Math.min(q.scrollHeight, 168) + "px"; }
+      q.addEventListener("input", autosize);
+      q.addEventListener("keydown", (e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); form.requestSubmit(); } });
+      form.addEventListener("submit", (e) => { e.preventDefault(); ask(q.value); });
+
+      // ---------- new chat ----------
+      $("newchat").addEventListener("click", () => {
+        if (busy) return;
+        messages = [];
+        thread.querySelectorAll(".turn").forEach((n) => n.remove());
+        renderEmpty(); scrollDown(); q.focus();
+      });
+
+      // ---------- upload ----------
+      $("adddocs").addEventListener("click", () => fileInput.click());
+      fileInput.addEventListener("change", () => upload([...fileInput.files]));
+      ["dragenter", "dragover"].forEach((ev) => document.addEventListener(ev, (e) => { e.preventDefault(); document.body.classList.add("dragging"); }));
+      ["dragleave", "drop"].forEach((ev) => document.addEventListener(ev, (e) => { e.preventDefault(); if (ev === "drop" || e.relatedTarget === null) document.body.classList.remove("dragging"); }));
+      document.addEventListener("drop", (e) => { const f = [...(e.dataTransfer?.files || [])]; if (f.length) upload(f); });
+
+      function toBase64(file) {
+        return new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(String(r.result).split(",")[1]); r.onerror = rej; r.readAsDataURL(file); });
+      }
+      function resetKb() {
+        activeKb = null;
+        kb.innerHTML = "Answering from the built-in <b>Acme</b> docs.";
+      }
       async function upload(files) {
-        if (!files.length) return;
-        kbbar.innerHTML = '<span class="dot"></span> indexing ' + files.length + ' file(s)…';
+        if (!files.length || busy) return;
+        kb.innerHTML = "Indexing " + files.length + " file(s)…";
         try {
           const payload = { files: [] };
           for (const f of files) payload.files.push({ name: f.name, base64: await toBase64(f) });
-          const r = await fetch("/api/upload", {
-            method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(payload),
-          });
-          const data = await r.json();
-          if (data.error) throw new Error(data.error);
-          activeKb = data.kbId;
-          examples.style.display = "none";
-          input.placeholder = "Ask a question about your uploaded files…";
-          const warn = data.flagged
-            ? '<div style="margin-top:6px;color:#e0a33e">⚠ This document contains text that looks like a prompt-injection attempt. It is indexed as <strong>data only</strong> — the assistant will not follow instructions hidden inside it.</div>'
-            : '';
-          kbbar.innerHTML = 'Answering <strong>only</strong> from your files: <strong>' +
-            esc(data.names.join(", ")) + '</strong> (' + data.chunks + ' chunks)' +
-            '<span class="reset" id="reset">use built-in docs</span>' + warn;
-          document.getElementById("reset").addEventListener("click", resetKb);
-        } catch (err) {
-          kbbar.innerHTML = 'Upload failed: ' + esc(err.message) + ' <span class="reset" id="reset">use built-in docs</span>';
-          const rb = document.getElementById("reset"); if (rb) rb.addEventListener("click", resetKb);
+          const r = await fetch("/api/upload", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(payload) });
+          const d = await r.json();
+          if (d.error) throw new Error(d.error);
+          activeKb = d.kbId;
+          messages = []; thread.querySelectorAll(".turn").forEach((n) => n.remove()); renderEmpty();
+          const warn = d.flagged ? ' <span class="warn">⚠ injection-like text detected; treated as data only.</span>' : "";
+          kb.innerHTML = "Answering only from <b>" + esc(d.names.join(", ")) + "</b> (" + d.chunks + " chunks). <button class=\"link\" id=\"usebuiltin\">use Acme docs</button>" + warn;
+          $("usebuiltin").addEventListener("click", () => { resetKb(); });
+        } catch (e) {
+          kb.innerHTML = '<span class="warn">Upload failed: ' + esc(e.message) + "</span> <button class=\"link\" id=\"usebuiltin\">use Acme docs</button>";
+          const b = $("usebuiltin"); if (b) b.addEventListener("click", () => resetKb());
         }
       }
 
-      function resetKb() {
-        activeKb = null;
-        examples.style.display = "flex";
-        input.placeholder = "Ask a question…";
-        kbbar.innerHTML = "Answering from the built-in <strong>Acme</strong> docs.";
-      }
+      q.focus();
     </script>
   </body>
 </html>

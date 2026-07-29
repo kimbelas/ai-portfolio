@@ -39,6 +39,67 @@ export async function answerQuestion(
   return { answer: text, sources, usage };
 }
 
+export interface ChatTurn {
+  role: "user" | "assistant";
+  content: string;
+}
+
+/**
+ * Multi-turn, streaming, grounded answer — the chat UI's backend.
+ *
+ * `messages` is the running conversation, ending with the latest user turn.
+ * Yields typed events for a transparent UI:
+ *   {type:"status"} → {type:"sources"} → {type:"token"}... → {type:"done"}
+ *
+ * Follow-ups are handled with the standard **condense-then-retrieve** pattern:
+ * when there's history we first rewrite the latest turn into a standalone search
+ * query (so "what about the Business plan?" retrieves correctly), then retrieve,
+ * then stream a grounded answer that also sees the recent history.
+ */
+export async function* answerChatStream(
+  store: InMemoryVectorStore,
+  messages: ChatTurn[],
+  k = 4,
+  retrieve: Retriever = retrieveReranked,
+) {
+  const latest = messages.at(-1)?.content ?? "";
+  const prior = messages.slice(0, -1);
+
+  yield { type: "status" as const, stage: "searching" as const };
+
+  // 1. Condense a follow-up into a standalone search query (only with history).
+  let searchQuery = latest;
+  if (prior.length > 0) {
+    const convo = messages
+      .map((m) => `${m.role === "user" ? "User" : "Assistant"}: ${m.content}`)
+      .join("\n");
+    const { text } = await chat({
+      system:
+        "Rewrite the LATEST user message as a standalone search query capturing its full intent — resolve any pronouns or references using the conversation. Output ONLY the query, nothing else.",
+      user: `${convo}\n\nStandalone search query:`,
+      maxTokens: 60,
+    });
+    if (text.trim()) searchQuery = text.trim();
+  }
+
+  // 2. Retrieve on the standalone query.
+  const sources = await retrieve(store, searchQuery, k);
+  yield { type: "sources" as const, sources };
+
+  // 3. Stream the grounded answer, giving the model the recent history too.
+  const recent = prior.slice(-4);
+  const historyText = recent.length
+    ? recent.map((m) => `${m.role === "user" ? "User" : "Assistant"}: ${m.content}`).join("\n") + "\n\n"
+    : "";
+  const user = `${historyText}Context:\n${buildContext(sources)}\n\nQuestion: ${latest}`;
+
+  let usage: any = null;
+  for await (const delta of streamChat({ system: SYSTEM, user, maxTokens: 512 }, (u) => { usage = u; })) {
+    yield { type: "token" as const, text: delta };
+  }
+  yield { type: "done" as const, sources, usage };
+}
+
 /** Same, but streams the answer token-by-token (for a responsive UI). */
 export async function* answerQuestionStream(
   store: InMemoryVectorStore,
