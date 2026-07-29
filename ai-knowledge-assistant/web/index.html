@@ -100,8 +100,8 @@
 
       <div class="thread" id="thread">
         <div class="empty" id="empty">
-          <h1>Ask about Acme — answers only from the docs.</h1>
-          <p>Retrieval-augmented, cited, and honest: it answers strictly from the source documents and says <em>“I don’t know”</em> when they don’t cover something. Bring your own PDF/Markdown/Word file to query instead.</p>
+          <h1 id="empty-h1">Ask about Acme — answers only from the docs.</h1>
+          <p id="empty-p">Retrieval-augmented, cited, and honest: it answers strictly from the source documents and says <em>“I don’t know”</em> when they don’t cover something. Or load a sample — or your own file — to query instead.</p>
           <div class="suggest" id="suggest"></div>
         </div>
       </div>
@@ -114,7 +114,7 @@
         </form>
         <div class="subrow">
           <span class="kb" id="kb">Answering from the built-in <b>Acme</b> docs.</span>
-          <span><button class="link" id="adddocs">＋ your documents</button> · <span class="foot">RAG · Groq · on-device embeddings</span></span>
+          <span><button class="link" id="trysample">Try a sample →</button> · <button class="link" id="adddocs">＋ your docs</button></span>
         </div>
       </div>
     </div>
@@ -136,6 +136,32 @@
         "Who is the CEO?",
       ];
 
+      // A self-contained sample document (a different domain) for one-click testing
+      // of bring-your-own-docs. Uploaded through the normal /api/upload path.
+      const SAMPLE_NAME = "nimbus-cafe-one.md";
+      const SAMPLE_DOC = `# Nimbus Café One — Espresso Machine
+
+The Nimbus Café One is a compact home espresso machine. It retails for $349 and comes in matte black or cream.
+
+## Specs
+- 15-bar Italian pump for espresso extraction.
+- 1.5-liter removable water tank.
+- Heats up in about 30 seconds (thermoblock).
+- Dimensions: 24 cm wide, 30 cm tall.
+
+## What it makes
+It makes espresso, ristretto, and Americano. It does NOT include a built-in milk frother — a manual steam wand is sold separately as the Nimbus Steam Kit ($59). There is no smartphone app; all controls are physical buttons on the front panel.
+
+## Care and support
+Descale every 3 months with the Nimbus descaling solution. The machine carries a 2-year limited warranty covering manufacturing defects. Support is email-only, with a 48-hour response target.`;
+      const SAMPLE_SUGGESTIONS = [
+        "How much does the Nimbus Café One cost?",
+        "Does it have a built-in milk frother?",
+        "How often should I descale it, and what's the warranty?",
+        "Is Acme HIPAA compliant?", // out-of-doc → should refuse, proving isolation
+      ];
+      let usingSample = false;
+
       // ---------- theme ----------
       const savedTheme = localStorage.getItem("theme");
       if (savedTheme) document.documentElement.dataset.theme = savedTheme;
@@ -148,8 +174,15 @@
 
       // ---------- empty state ----------
       function renderEmpty() {
+        if (usingSample) {
+          $("empty-h1").textContent = "Ask about the Nimbus Café One.";
+          $("empty-p").innerHTML = "You loaded a sample document — answers come <em>only</em> from it. Ask a spec, or try an Acme question to watch it correctly say <em>“I don’t know.”</em>";
+        } else {
+          $("empty-h1").textContent = "Ask about Acme — answers only from the docs.";
+          $("empty-p").innerHTML = "Retrieval-augmented, cited, and honest: it answers strictly from the source documents and says <em>“I don’t know”</em> when they don’t cover something. Or load a sample — or your own file — to query instead.";
+        }
         const s = $("suggest"); s.innerHTML = "";
-        SUGGESTIONS.forEach((text) => {
+        (usingSample ? SAMPLE_SUGGESTIONS : SUGGESTIONS).forEach((text) => {
           const b = document.createElement("button");
           b.innerHTML = '<span>' + esc(text) + '</span><span class="arr">→</span>';
           b.addEventListener("click", () => ask(text));
@@ -276,6 +309,7 @@
 
       // ---------- upload ----------
       $("adddocs").addEventListener("click", () => fileInput.click());
+      $("trysample").addEventListener("click", () => uploadSample());
       fileInput.addEventListener("change", () => upload([...fileInput.files]));
       ["dragenter", "dragover"].forEach((ev) => document.addEventListener(ev, (e) => { e.preventDefault(); document.body.classList.add("dragging"); }));
       ["dragleave", "drop"].forEach((ev) => document.addEventListener(ev, (e) => { e.preventDefault(); if (ev === "drop" || e.relatedTarget === null) document.body.classList.remove("dragging"); }));
@@ -285,27 +319,38 @@
         return new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(String(r.result).split(",")[1]); r.onerror = rej; r.readAsDataURL(file); });
       }
       function resetKb() {
-        activeKb = null;
+        activeKb = null; usingSample = false;
         kb.innerHTML = "Answering from the built-in <b>Acme</b> docs.";
+        if (!thread.querySelector(".turn")) renderEmpty(); // refresh suggestions if on the empty state
       }
-      async function upload(files) {
-        if (!files.length || busy) return;
-        kb.innerHTML = "Indexing " + files.length + " file(s)…";
+      async function indexUpload(payloadFiles, opts = {}) {
+        if (!payloadFiles.length || busy) return;
+        kb.textContent = "Indexing " + payloadFiles.length + " file(s)…";
         try {
-          const payload = { files: [] };
-          for (const f of files) payload.files.push({ name: f.name, base64: await toBase64(f) });
-          const r = await fetch("/api/upload", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(payload) });
+          const r = await fetch("/api/upload", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ files: payloadFiles }) });
           const d = await r.json();
           if (d.error) throw new Error(d.error);
-          activeKb = d.kbId;
+          activeKb = d.kbId; usingSample = !!opts.sample;
           messages = []; thread.querySelectorAll(".turn").forEach((n) => n.remove()); renderEmpty();
           const warn = d.flagged ? ' <span class="warn">⚠ injection-like text detected; treated as data only.</span>' : "";
           kb.innerHTML = "Answering only from <b>" + esc(d.names.join(", ")) + "</b> (" + d.chunks + " chunks). <button class=\"link\" id=\"usebuiltin\">use Acme docs</button>" + warn;
-          $("usebuiltin").addEventListener("click", () => { resetKb(); });
+          $("usebuiltin").addEventListener("click", () => resetKb());
+          q.focus();
         } catch (e) {
+          usingSample = false;
           kb.innerHTML = '<span class="warn">Upload failed: ' + esc(e.message) + "</span> <button class=\"link\" id=\"usebuiltin\">use Acme docs</button>";
           const b = $("usebuiltin"); if (b) b.addEventListener("click", () => resetKb());
         }
+      }
+      async function upload(files) {
+        if (!files.length) return;
+        const payloadFiles = [];
+        for (const f of files) payloadFiles.push({ name: f.name, base64: await toBase64(f) });
+        await indexUpload(payloadFiles, { sample: false });
+      }
+      async function uploadSample() {
+        const base64 = btoa(unescape(encodeURIComponent(SAMPLE_DOC))); // UTF-8-safe (é in "Café")
+        await indexUpload([{ name: SAMPLE_NAME, base64 }], { sample: true });
       }
 
       q.focus();
